@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBag, Menu, X, User, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/hooks/useCart";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navLinks = [
   { name: "Home", path: "/" },
@@ -17,6 +19,9 @@ export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { data: cartItems = [] } = useCart();
+  const { user } = useAuth();
+  const cartCount = cartItems.length;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -84,7 +89,7 @@ export const Navbar = () => {
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Search className="h-5 w-5" />
               </Button>
-              <Link to="/login">
+              <Link to={user ? "/profile" : "/login"}>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <User className="h-5 w-5" />
                 </Button>
@@ -92,16 +97,25 @@ export const Navbar = () => {
               <Link to="/cart">
                 <Button variant="ghost" size="icon" className="rounded-full relative">
                   <ShoppingBag className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                    0
-                  </span>
+                  {cartCount > 0 && (
+                    <motion.span
+                      key={cartCount}
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold"
+                    >
+                      {cartCount > 99 ? "99+" : cartCount}
+                    </motion.span>
+                  )}
                 </Button>
               </Link>
-              <Link to="/login">
-                <Button variant="hero" size="sm">
-                  Sign In
-                </Button>
-              </Link>
+              {!user ? (
+                <Link to="/login">
+                  <Button variant="hero" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+              ) : null}
             </div>
 
             {/* Mobile Menu Button */}
@@ -109,9 +123,16 @@ export const Navbar = () => {
               <Link to="/cart">
                 <Button variant="ghost" size="icon" className="rounded-full relative">
                   <ShoppingBag className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                    0
-                  </span>
+                  {cartCount > 0 && (
+                    <motion.span
+                      key={`mobile-${cartCount}`}
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold"
+                    >
+                      {cartCount > 99 ? "99+" : cartCount}
+                    </motion.span>
+                  )}
                 </Button>
               </Link>
               <Button
@@ -169,16 +190,26 @@ export const Navbar = () => {
                   transition={{ delay: navLinks.length * 0.1 }}
                   className="flex flex-col gap-3 mt-4"
                 >
-                  <Link to="/login">
-                    <Button variant="hero" size="lg" className="w-full">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/signup">
-                    <Button variant="hero-outline" size="lg" className="w-full">
-                      Create Account
-                    </Button>
-                  </Link>
+                  {!user ? (
+                    <>
+                      <Link to="/login">
+                        <Button variant="hero" size="lg" className="w-full">
+                          Sign In
+                        </Button>
+                      </Link>
+                      <Link to="/signup">
+                        <Button variant="hero-outline" size="lg" className="w-full">
+                          Create Account
+                        </Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <Link to="/profile">
+                      <Button variant="hero" size="lg" className="w-full">
+                        My Profile
+                      </Button>
+                    </Link>
+                  )}
                 </motion.div>
               </div>
             </div>

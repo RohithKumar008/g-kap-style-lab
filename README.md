@@ -1,53 +1,156 @@
-# Welcome to your Lovable project
+# G-KAP E-Commerce Store 🛍️
 
-## Project info
+A modern, full-stack e-commerce platform for a clothing business built with React, TypeScript, Express, and Supabase.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🌟 Features
 
-## How can I edit this code?
+### Frontend
+- ✅ **Modern UI** with shadcn/ui components
+- ✅ **Responsive Design** for all devices
+- ✅ **Product Catalog** with filtering and sorting
+- ✅ **Shopping Cart** with persistent storage
+- ✅ **Custom T-Shirt Designer** - Upload designs and customize
+- ✅ **Authentication** - Sign up, login, logout
+- ✅ **Order Management** - Track purchases
+- ✅ **Beautiful Animations** with Framer Motion
 
-There are several ways of editing your application.
+### Backend
+- ✅ **RESTful API** built with Express.js
+- ✅ **PostgreSQL Database** via Supabase
+- ✅ **JWT Authentication**
+- ✅ **File Upload** support for custom designs
+- ✅ **Row Level Security** for data protection
+- ✅ **Automatic Order Numbers**
 
-**Use Lovable**
+### Database
+- ✅ **Products** - Store all merchandise
+- ✅ **Users** - Customer accounts (Supabase Auth)
+- ✅ **Cart** - Persistent shopping carts
+- ✅ **Orders** - Complete order history
+- ✅ **Custom Designs** - User-uploaded t-shirt designs
+- ✅ **Storage Buckets** - Product images & user designs
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 🚀 Quick Start
 
-Changes made via Lovable will be committed automatically to this repo.
+### 1. Install Dependencies
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+npm install
 ```
 
-**Edit a file directly in GitHub**
+### 2. Set Up Supabase
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+📖 **See [SETUP.md](SETUP.md) for complete instructions** on:
+- Creating a Supabase project
+- Running the database schema
+- Setting up storage buckets
+- Getting your credentials
 
-**Use GitHub Codespaces**
+### 3. Configure Environment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
+Create `.env` in the root:
+
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_anon_key
+PORT=3001
+```
+
+Create `.env.local`:
+
+```env
+VITE_API_URL=http://localhost:3001/api
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+```
+
+### 4. Run the Application
+
+```bash
+# Run both frontend and backend together
+npm run dev:all
+
+# Or run separately:
+# Terminal 1 - Frontend
+npm run dev
+
+# Terminal 2 - Backend
+npm run server
+```
+
+Visit `http://localhost:5173` 🎉
+
+## 📁 Project Structure
+
+```
+g-kap-style-lab/
+├── server/                 # Backend Express API
+│   ├── config/            # Database config
+│   ├── middleware/        # Auth middleware
+│   ├── routes/            # API routes (auth, products, cart, orders, customize)
+│   └── index.ts           # Server entry
+├── src/                   # Frontend React app
+│   ├── components/        # UI components
+│   ├── contexts/          # Auth context
+│   ├── hooks/             # Custom hooks & API services
+│   ├── pages/             # Route pages
+│   ├── config/            # Frontend config
+│   └── App.tsx            # App entry
+├── supabase-schema.sql    # Database schema
+├── SETUP.md               # Detailed setup guide
+└── package.json
+```
+
+## 🛠️ Tech Stack
+
+**Frontend:** React, TypeScript, Vite, TailwindCSS, shadcn/ui, Tanstack Query, Framer Motion
+
+**Backend:** Node.js, Express, TypeScript, Supabase, Multer
+
+## 📡 Key API Endpoints
+
+- **Auth**: `/api/auth/signup`, `/api/auth/signin`, `/api/auth/signout`
+- **Products**: `/api/products`, `/api/products/:id`
+- **Cart**: `/api/cart` (protected)
+- **Orders**: `/api/orders` (protected)
+- **Custom Designs**: `/api/customize` (protected)
+
+## 🎨 Business Features
+
+- Product management with unlimited products
+- Customer accounts & authentication
+- Persistent shopping cart
+- Order history & tracking
+- **Custom t-shirt designer** - customers upload designs
+- Inventory tracking
+- Size & color variants
+
+## 🔐 Security
+
+✅ JWT authentication, Row Level Security, Secure file uploads, Environment variables, SQL injection protection
+
+## 🚀 Deployment
+
+See [SETUP.md](SETUP.md) for deployment to Vercel (frontend) and Render/Railway (backend).
+
+## 🔧 Scripts
+
+```bash
+npm run dev          # Frontend only
+npm run server       # Backend only
+npm run dev:all      # Both (recommended)
+npm run build        # Production build
+```
+
+---
+
+Built with ❤️ for G-KAP Clothing
+npm run server
+```
+
+Visit `http://localhost:5173` 🎉
+
+## 📁 Project Structure
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
 ## What technologies are used for this project?

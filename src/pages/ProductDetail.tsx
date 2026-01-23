@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Heart, ShoppingBag, Truck, Shield, RefreshCw, Minus, Plus, Star, ChevronRight } from "lucide-react";
@@ -7,18 +7,82 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Layout } from "@/components/layout/Layout";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { products, colorOptions } from "@/data/products";
+import { colorOptions } from "@/data/products";
+import { useProduct, useProducts } from "@/hooks/useProducts";
+import { useAddToCart } from "@/hooks/useCart";
+import { useToast } from "@/hooks/use-toast";
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const product = products.find((p) => p.id === id);
-  
-  const [selectedColor, setSelectedColor] = useState(product?.colors[0] || "");
+  const { data: product, isLoading, error } = useProduct(id || "");
+  const { data: allProducts = [] } = useProducts();
+  const { mutateAsync: addToCart, isPending } = useAddToCart();
+  const { toast } = useToast();
+
+  const productData = useMemo(() => {
+    if (!product) return null;
+    return {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      originalPrice: product.original_price,
+      image: product.image_url,
+      category: product.category,
+      collection: product.collection,
+      colors: product.colors || [],
+      sizes: product.sizes || [],
+      fit: product.fit,
+      isNew: product.is_new,
+      isBestseller: product.is_bestseller,
+    };
+  }, [product]);
+
+  const relatedProducts = useMemo(() => {
+    if (!productData) return [];
+    return allProducts
+      .filter((p) => p.id !== productData.id && p.collection === productData.collection)
+      .slice(0, 4)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        originalPrice: p.original_price,
+        image: p.image_url,
+        category: p.category,
+        collection: p.collection,
+        colors: p.colors || [],
+        sizes: p.sizes || [],
+        fit: p.fit,
+        isNew: p.is_new,
+        isBestseller: p.is_bestseller,
+      }));
+  }, [allProducts, productData]);
+
+  const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
-  if (!product) {
+  useEffect(() => {
+    if (productData) {
+      setSelectedColor(productData.colors[0] || "");
+      setSelectedSize("");
+      setQuantity(1);
+      setActiveImage(0);
+    }
+  }, [productData]);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="section-container py-20 text-center text-muted-foreground">
+          Loading product...
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !productData) {
     return (
       <Layout>
         <div className="section-container py-20 text-center">
@@ -30,10 +94,6 @@ const ProductDetail = () => {
       </Layout>
     );
   }
-
-  const relatedProducts = products
-    .filter((p) => p.id !== product.id && p.collection === product.collection)
-    .slice(0, 4);
 
   const getColorHex = (colorName: string) => {
     return colorOptions.find((c) => c.id === colorName)?.hex || "#ccc";
@@ -52,7 +112,7 @@ const ProductDetail = () => {
             Shop
           </Link>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          <span className="text-foreground">{product.name}</span>
+          <span className="text-foreground">{productData.name}</span>
         </nav>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
@@ -64,16 +124,16 @@ const ProductDetail = () => {
               className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted"
             >
               <img
-                src={product.image}
-                alt={product.name}
+                src={productData.image}
+                alt={productData.name}
                 className="absolute inset-0 w-full h-full object-cover"
               />
-              {product.isNew && (
+              {productData.isNew && (
                 <Badge className="absolute top-4 left-4 bg-coral text-primary-foreground border-0">
                   New Arrival
                 </Badge>
               )}
-              {product.isBestseller && (
+              {productData.isBestseller && (
                 <Badge className="absolute top-4 left-4 bg-mint text-foreground border-0">
                   Bestseller
                 </Badge>
@@ -91,7 +151,7 @@ const ProductDetail = () => {
                   }`}
                 >
                   <img
-                    src={product.image}
+                    src={productData.image}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover"
                   />
@@ -103,9 +163,9 @@ const ProductDetail = () => {
           {/* Product Info */}
           <div className="space-y-6">
             <div>
-              <p className="text-muted-foreground mb-1">{product.fit}</p>
+              <p className="text-muted-foreground mb-1">{productData.fit}</p>
               <h1 className="text-3xl md:text-4xl font-display font-bold mb-2">
-                {product.name}
+                {productData.name}
               </h1>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">
@@ -119,15 +179,15 @@ const ProductDetail = () => {
 
             <div className="flex items-center gap-3">
               <span className="text-3xl font-display font-bold">
-                ${product.price.toFixed(2)}
+                ${productData.price.toFixed(2)}
               </span>
-              {product.originalPrice && (
+              {productData.originalPrice && (
                 <>
                   <span className="text-xl text-muted-foreground line-through">
-                    ${product.originalPrice.toFixed(2)}
+                    ${productData.originalPrice.toFixed(2)}
                   </span>
                   <Badge className="bg-destructive text-destructive-foreground">
-                    Save ${(product.originalPrice - product.price).toFixed(2)}
+                    Save ${(productData.originalPrice - productData.price).toFixed(2)}
                   </Badge>
                 </>
               )}
@@ -139,7 +199,7 @@ const ProductDetail = () => {
                 Color: <span className="font-normal capitalize">{selectedColor}</span>
               </p>
               <div className="flex gap-2">
-                {product.colors.map((color) => (
+                {productData.colors.map((color) => (
                   <button
                     key={color}
                     onClick={() => setSelectedColor(color)}
@@ -164,7 +224,7 @@ const ProductDetail = () => {
                 </Link>
               </div>
               <div className="flex flex-wrap gap-2">
-                {product.sizes.map((size) => (
+                {productData.sizes.map((size) => (
                   <button
                     key={size}
                     onClick={() => setSelectedSize(size)}
@@ -210,10 +270,30 @@ const ProductDetail = () => {
                 variant="hero"
                 size="xl"
                 className="flex-1"
-                disabled={!selectedSize}
+                disabled={!selectedSize || isPending}
+                onClick={async () => {
+                  try {
+                    await addToCart({
+                      product_id: productData.id,
+                      quantity: quantity,
+                      selected_size: selectedSize,
+                      selected_color: selectedColor,
+                    });
+                    toast({
+                      title: "Added to cart!",
+                      description: `${productData.name} x${quantity} has been added to your cart.`,
+                    });
+                  } catch (error: any) {
+                    toast({
+                      title: "Error",
+                      description: error.response?.data?.error || "Failed to add to cart",
+                      variant: "destructive",
+                    });
+                  }
+                }}
               >
                 <ShoppingBag className="w-5 h-5 mr-2" />
-                Add to Cart
+                {isPending ? "Adding..." : "Add to Cart"}
               </Button>
               <Button variant="outline" size="xl">
                 <Heart className="w-5 h-5" />
@@ -268,8 +348,8 @@ const ProductDetail = () => {
             <TabsContent value="description" className="pt-6">
               <div className="prose max-w-none">
                 <p className="text-muted-foreground">
-                  The {product.name} is crafted for those who want to make a statement. 
-                  Featuring premium DTG (Direct-to-Garment) printing technology, every detail 
+                  The {productData.name} is crafted for those who want to make a statement.
+                  Featuring premium DTG (Direct-to-Garment) printing technology, every detail
                   of the design comes through with vibrant, long-lasting colors.
                 </p>
                 <ul className="mt-4 space-y-2 text-muted-foreground">
@@ -277,7 +357,7 @@ const ProductDetail = () => {
                   <li>• Pre-shrunk for a consistent fit</li>
                   <li>• Reinforced double-stitched seams</li>
                   <li>• Printed with eco-friendly inks</li>
-                  <li>• {product.fit} silhouette</li>
+                  <li>• {productData.fit} silhouette</li>
                 </ul>
               </div>
             </TabsContent>

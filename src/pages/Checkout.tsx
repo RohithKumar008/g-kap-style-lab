@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, CreditCard, Truck, ChevronRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,16 +8,165 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
+import { useDeleteDesign } from "@/hooks/useCustomize";
+import { useCreateOrder } from "@/hooks/useOrders";
+import { useCart } from "@/hooks/useCart";
+import { useToast } from "@/hooks/use-toast";
+
+interface CustomDesign {
+  id: string;
+  image_url: string;
+  tshirt_type: string;
+  tshirt_color: string;
+  size: string;
+  quantity: number;
+  print_location: string;
+  image_scale: number;
+}
 
 const Checkout = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [step, setStep] = useState<"shipping" | "payment" | "confirmation">("shipping");
   const [shippingMethod, setShippingMethod] = useState("standard");
+  const [designToBuy, setDesignToBuy] = useState<CustomDesign | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { mutateAsync: deleteDesign } = useDeleteDesign();
+  const { mutateAsync: createOrder } = useCreateOrder();
+  const { data: cartItems = [] } = useCart();
 
-  const subtotal = 149.97;
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "",
+    cardName: "",
+    cardNumber: "",
+    expiry: "",
+    cvv: "",
+  });
+
+  useEffect(() => {
+    const stored = localStorage.getItem('designToBuy');
+    if (stored) {
+      setDesignToBuy(JSON.parse(stored));
+    }
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  // Normalize cart items to get price from products relationship
+  const normalizedCartItems = cartItems.map((item) => {
+    const p = item.products;
+    return {
+      id: item.id,
+      product_id: item.product_id,
+      name: p?.name ?? "Item",
+      price: p?.price ?? 0,
+      selected_size: item.selected_size,
+      selected_color: item.selected_color,
+      quantity: item.quantity,
+      image: p?.image_url ?? "",
+    };
+  });
+
+  // Price for custom design
+  const designPrice = 49.99;
+  const subtotal = designToBuy 
+    ? designPrice * (designToBuy.quantity || 1) 
+    : normalizedCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const shipping = shippingMethod === "express" ? 14.99 : 0;
   const tax = (subtotal + shipping) * 0.08;
   const total = subtotal + shipping + tax;
+
+  const handleConfirmation = async () => {
+    setIsProcessing(true);
+    try {
+      // Prepare order data
+      const orderData = {
+        items: designToBuy 
+          ? [{
+              product_id: null, // No product_id for custom designs
+              quantity: designToBuy.quantity,
+              size: designToBuy.size,
+              color: designToBuy.tshirt_color,
+              price: designPrice,
+              design_id: designToBuy.id // Include design_id for tracking
+            }]
+          : normalizedCartItems.map(item => ({ 
+              product_id: item.product_id, 
+              quantity: item.quantity,
+              size: item.selected_size,
+              color: item.selected_color,
+              price: item.price
+            })),
+        shipping_address: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          country: formData.country,
+        },
+        shipping_method: shippingMethod,
+        payment_method: "credit_card",
+        subtotal,
+        shipping_cost: shipping,
+        tax,
+        total,
+      };
+
+      console.log("Creating order with data:", orderData);
+
+      // Create order in database
+      await createOrder(orderData);
+
+      // Delete the design if it was a custom design purchase
+      if (designToBuy?.id) {
+        try {
+          await deleteDesign(designToBuy.id);
+        } catch (error) {
+          console.error("Error deleting design:", error);
+        }
+      }
+
+      // Clear the localStorage
+      localStorage.removeItem('designToBuy');
+
+      toast({
+        title: "Order Placed!",
+        description: "Your order has been successfully created and saved.",
+      });
+
+      // Navigate to confirmation
+      setStep("confirmation");
+    } catch (error: any) {
+      console.error("Error placing order:", error);
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to place order. Please try again.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (step === "confirmation") {
     return (
@@ -38,8 +188,10 @@ const Checkout = () => {
             </p>
             <p className="font-semibold mb-8">Order #GK-{Math.random().toString(36).substring(2, 8).toUpperCase()}</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/shop">
-                <Button variant="hero">Continue Shopping</Button>
+              <Link to={designToBuy ? "/profile" : "/shop"}>
+                <Button variant="hero">
+                  {designToBuy ? "Back to Profile" : "Continue Shopping"}
+                </Button>
               </Link>
               <Button variant="outline">Track Order</Button>
             </div>
@@ -54,9 +206,9 @@ const Checkout = () => {
       <div className="section-container py-8 md:py-12">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm mb-8">
-          <Link to="/cart" className="text-muted-foreground hover:text-primary flex items-center gap-1">
+          <Link to={designToBuy ? "/profile" : "/cart"} className="text-muted-foreground hover:text-primary flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" />
-            Back to Cart
+            {designToBuy ? "Back to Profile" : "Back to Cart"}
           </Link>
         </nav>
 
@@ -101,39 +253,39 @@ const Checkout = () => {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" placeholder="John" />
+                      <Input id="firstName" placeholder="John" value={formData.firstName} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" placeholder="Doe" />
+                      <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="john@example.com" />
+                      <Input id="email" type="email" placeholder="john@example.com" value={formData.email} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="phone">Phone</Label>
-                      <Input id="phone" type="tel" placeholder="+1 (555) 123-4567" />
+                      <Input id="phone" type="tel" placeholder="+1 (555) 123-4567" value={formData.phone} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="address">Street Address</Label>
-                      <Input id="address" placeholder="123 Main Street" />
+                      <Input id="address" placeholder="123 Main Street" value={formData.address} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="city">City</Label>
-                      <Input id="city" placeholder="New York" />
+                      <Input id="city" placeholder="New York" value={formData.city} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State</Label>
-                      <Input id="state" placeholder="NY" />
+                      <Input id="state" placeholder="NY" value={formData.state} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="zip">ZIP Code</Label>
-                      <Input id="zip" placeholder="10001" />
+                      <Input id="zip" placeholder="10001" value={formData.zip} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="country">Country</Label>
-                      <Input id="country" placeholder="United States" />
+                      <Input id="country" placeholder="United States" value={formData.country} onChange={handleInputChange} />
                     </div>
                   </div>
                 </div>
@@ -197,20 +349,20 @@ const Checkout = () => {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="cardName">Name on Card</Label>
-                      <Input id="cardName" placeholder="John Doe" />
+                      <Input id="cardName" placeholder="John Doe" value={formData.cardName} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
+                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" value={formData.cardNumber} onChange={handleInputChange} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM/YY" />
+                        <Input id="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="cvv">CVV</Label>
-                        <Input id="cvv" placeholder="123" />
+                        <Input id="cvv" placeholder="123" value={formData.cvv} onChange={handleInputChange} />
                       </div>
                     </div>
                   </div>
@@ -228,6 +380,7 @@ const Checkout = () => {
                     variant="outline"
                     size="lg"
                     onClick={() => setStep("shipping")}
+                    disabled={isProcessing}
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back
@@ -236,9 +389,10 @@ const Checkout = () => {
                     variant="hero"
                     size="xl"
                     className="flex-1"
-                    onClick={() => setStep("confirmation")}
+                    onClick={handleConfirmation}
+                    disabled={isProcessing}
                   >
-                    Place Order - ${total.toFixed(2)}
+                    {isProcessing ? "Processing..." : `Place Order - $${total.toFixed(2)}`}
                   </Button>
                 </div>
               </motion.div>
@@ -250,24 +404,56 @@ const Checkout = () => {
             <div className="bg-card rounded-2xl p-6 shadow-soft sticky top-24">
               <h2 className="font-display font-bold text-xl mb-6">Order Summary</h2>
 
-              <div className="space-y-4 mb-6">
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-lg bg-muted" />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Geometric Motion Tee</p>
-                    <p className="text-xs text-muted-foreground">Size: M • Color: White</p>
-                    <p className="text-sm font-semibold">$39.99</p>
+              {designToBuy ? (
+                <>
+                  {/* Custom Design Summary */}
+                  <div className="space-y-4 mb-6">
+                    <div className="flex gap-3">
+                      {designToBuy.image_url && (
+                        <img
+                          src={designToBuy.image_url}
+                          alt="Custom design"
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <Badge className="mb-2 bg-mint text-foreground">Custom Design</Badge>
+                        <p className="font-medium text-sm capitalize">
+                          {designToBuy.tshirt_type} - {designToBuy.tshirt_color}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Size: {designToBuy.size} • Qty: {designToBuy.quantity}
+                        </p>
+                        <p className="text-sm font-semibold mt-2">${designPrice.toFixed(2)}</p>
+                      </div>
+                    </div>
                   </div>
+                </>
+              ) : (
+                <div className="space-y-4 mb-6">
+                  {normalizedCartItems.map((item) => (
+                    <div key={item.id} className="flex gap-3">
+                      {item.image && (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Size: {item.selected_size} • Color: {item.selected_color}
+                        </p>
+                        <p className="text-sm font-semibold">
+                          ${(item.price * item.quantity).toFixed(2)}
+                          {item.quantity > 1 && ` (${item.quantity}x)`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-lg bg-muted" />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Sakura Dreams Oversized ×2</p>
-                    <p className="text-xs text-muted-foreground">Size: L • Color: Black</p>
-                    <p className="text-sm font-semibold">$109.98</p>
-                  </div>
-                </div>
-              </div>
+              )}
 
               <Separator className="my-4" />
 

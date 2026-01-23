@@ -1,30 +1,16 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, RotateCcw, ZoomIn, ZoomOut, Move, Trash2, ShoppingBag, Sparkles, Check } from "lucide-react";
+import { Upload, RotateCcw, Trash2, ShoppingBag, Sparkles, Check } from "lucide-react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Layout } from "@/components/layout/Layout";
-import tshirtMockup from "@/assets/tshirt-mockup.jpg";
-
-const tshirtTypes = [
-  { id: "regular", name: "Regular Fit", price: 29.99 },
-  { id: "oversized", name: "Oversized", price: 34.99 },
-  { id: "premium", name: "Premium Cotton", price: 39.99 },
-  { id: "polo", name: "Polo", price: 44.99 },
-  { id: "longsleeve", name: "Long Sleeve", price: 39.99 },
-];
-
-const tshirtColors = [
-  { id: "white", name: "White", hex: "#FFFFFF" },
-  { id: "black", name: "Black", hex: "#1a1a1a" },
-  { id: "gray", name: "Gray", hex: "#6B7280" },
-  { id: "navy", name: "Navy", hex: "#1e3a5f" },
-  { id: "sage", name: "Sage", hex: "#9DC183" },
-  { id: "coral", name: "Coral", hex: "#FF7F50" },
-  { id: "lavender", name: "Lavender", hex: "#E6E6FA" },
-  { id: "cream", name: "Cream", hex: "#FFFDD0" },
-];
+import { useUploadDesign } from "@/hooks/useCustomize";
+import { useTshirtTypes, useTshirtColors } from "@/hooks/useTshirtOptions";
+import { useToast } from "@/hooks/use-toast";
+import { ThreeShirtViewer } from "@/components/customizer/ThreeShirtViewer";
+import api from "@/config/api";
 
 const sizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 
@@ -34,20 +20,85 @@ const printLocations = [
 ];
 
 const Customize = () => {
-  const [selectedType, setSelectedType] = useState(tshirtTypes[0]);
-  const [selectedColor, setSelectedColor] = useState(tshirtColors[0]);
+  const { designId } = useParams<{ designId?: string }>();
+  const { data: tshirtTypes = [], isLoading: loadingTypes } = useTshirtTypes();
+  const { data: tshirtColors = [], isLoading: loadingColors } = useTshirtColors();
+  
+  const [selectedType, setSelectedType] = useState<any>(null);
+  const [selectedColor, setSelectedColor] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState("");
   const [printLocation, setPrintLocation] = useState("front");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [imageScale, setImageScale] = useState([1]);
   const [imageRotation, setImageRotation] = useState([0]);
   const [quantity, setQuantity] = useState(1);
+  const [isLoadingDesign, setIsLoadingDesign] = useState(!!designId);
 
+  const { mutateAsync: uploadDesign, isPending: isUploading } = useUploadDesign();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load design if editing
+  useEffect(() => {
+    if (designId) {
+      setIsLoadingDesign(true);
+      api
+        .get(`/customize/design/${designId}`)
+        .then((res) => {
+          const design = res.data;
+          setSelectedSize(design.size || "");
+          setPrintLocation(design.print_location || "front");
+          setImageScale([design.image_scale || 1]);
+          setImageRotation([design.image_rotation || 0]);
+          setQuantity(design.quantity || 1);
+          
+          // Set uploaded image from design
+          if (design.image_url) {
+            setUploadedImage(design.image_url);
+          }
+          
+          // Find and set type/color from database values
+          if (design.tshirt_type && tshirtTypes.length > 0) {
+            const type = tshirtTypes.find((t) => t.type_id === design.tshirt_type);
+            if (type) setSelectedType(type);
+          }
+          if (design.tshirt_color && tshirtColors.length > 0) {
+            const color = tshirtColors.find((c) => c.color_id === design.tshirt_color);
+            if (color) setSelectedColor(color);
+          }
+          
+          setIsLoadingDesign(false);
+        })
+        .catch((err) => {
+          console.error("Failed to load design:", err);
+          toast({
+            title: "Error",
+            description: "Failed to load design",
+            variant: "destructive",
+          });
+          setIsLoadingDesign(false);
+        });
+    }
+  }, [designId, tshirtTypes, tshirtColors, toast]);
+
+  // Set defaults when data loads
+  useEffect(() => {
+    if (!selectedType && tshirtTypes.length > 0) {
+      setSelectedType(tshirtTypes[0]);
+    }
+  }, [selectedType, tshirtTypes]);
+
+  useEffect(() => {
+    if (!selectedColor && tshirtColors.length > 0) {
+      setSelectedColor(tshirtColors[0]);
+    }
+  }, [selectedColor, tshirtColors]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setUploadedFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
         setUploadedImage(e.target?.result as string);
@@ -58,6 +109,7 @@ const Customize = () => {
 
   const clearImage = () => {
     setUploadedImage(null);
+    setUploadedFile(null);
     setImageScale([1]);
     setImageRotation([0]);
     if (fileInputRef.current) {
@@ -66,7 +118,7 @@ const Customize = () => {
   };
 
   const printPrice = uploadedImage ? 10 : 0;
-  const totalPrice = (selectedType.price + printPrice) * quantity;
+  const totalPrice = selectedType ? (selectedType.price + printPrice) * quantity : 0;
 
   return (
     <Layout>
@@ -107,51 +159,13 @@ const Customize = () => {
             {/* Preview Panel */}
             <div className="space-y-6">
               <div className="sticky top-24">
-                {/* Main Preview */}
-                <div 
-                  className="relative aspect-square rounded-2xl overflow-hidden shadow-large"
-                  style={{ backgroundColor: selectedColor.hex === "#FFFFFF" ? "#f5f5f5" : selectedColor.hex }}
-                >
-                  {/* T-shirt image with color overlay effect */}
-                  <div className="absolute inset-0 flex items-center justify-center p-8">
-                    <div className="relative w-full max-w-md">
-                      <img
-                        src={tshirtMockup}
-                        alt="T-shirt mockup"
-                        className="w-full h-auto"
-                        style={{ 
-                          filter: selectedColor.id === "white" ? "none" : 
-                                  selectedColor.id === "black" ? "brightness(0.2)" :
-                                  `sepia(1) saturate(0) brightness(${selectedColor.id === "navy" ? 0.3 : 0.8})`
-                        }}
-                      />
-                      
-                      {/* Uploaded Design */}
-                      {uploadedImage && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div 
-                            className="w-1/2 h-1/2 flex items-center justify-center"
-                            style={{
-                              transform: `scale(${imageScale[0]}) rotate(${imageRotation[0]}deg)`,
-                              marginTop: printLocation === "front" ? "-10%" : "0"
-                            }}
-                          >
-                            <img
-                              src={uploadedImage}
-                              alt="Your design"
-                              className="max-w-full max-h-full object-contain"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Print location indicator */}
-                  <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium">
-                    {printLocation === "front" ? "Front View" : "Back View"}
-                  </div>
-                </div>
+                <ThreeShirtViewer
+                  colorHex={selectedColor?.hex_code}
+                  logoUrl={uploadedImage}
+                  printLocation={printLocation as "front" | "back"}
+                  logoScale={imageScale[0]}
+                  logoRotation={imageRotation[0]}
+                />
 
                 {/* Print Location Toggle */}
                 <div className="flex gap-2 mt-4">
@@ -264,14 +278,14 @@ const Customize = () => {
                       key={type.id}
                       onClick={() => setSelectedType(type)}
                       className={`p-4 rounded-xl border text-left transition-all ${
-                        selectedType.id === type.id
+                        selectedType?.id === type.id
                           ? "border-primary bg-primary/5 ring-2 ring-primary"
                           : "border-border hover:border-primary/50"
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{type.name}</span>
-                        {selectedType.id === type.id && (
+                        {selectedType?.id === type.id && (
                           <Check className="w-5 h-5 text-primary" />
                         )}
                       </div>
@@ -284,7 +298,7 @@ const Customize = () => {
               {/* Color Selection */}
               <div className="bg-card rounded-2xl p-6 shadow-soft">
                 <h3 className="font-display font-bold text-lg mb-4">
-                  Color: <span className="font-normal">{selectedColor.name}</span>
+                  Color: <span className="font-normal">{selectedColor?.name || "Select a color"}</span>
                 </h3>
                 <div className="flex flex-wrap gap-3">
                   {tshirtColors.map((color) => (
@@ -292,11 +306,11 @@ const Customize = () => {
                       key={color.id}
                       onClick={() => setSelectedColor(color)}
                       className={`w-12 h-12 rounded-full border-2 transition-all ${
-                        selectedColor.id === color.id
+                        selectedColor?.id === color.id
                           ? "border-primary ring-2 ring-primary ring-offset-2"
                           : "border-border hover:border-primary/50"
                       }`}
-                      style={{ backgroundColor: color.hex }}
+                      style={{ backgroundColor: color.hex_code }}
                       title={color.name}
                     />
                   ))}
@@ -355,8 +369,8 @@ const Customize = () => {
                 {/* Price Summary */}
                 <div className="space-y-2 mb-6 pb-6 border-b">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{selectedType.name}</span>
-                    <span>${selectedType.price.toFixed(2)}</span>
+                    <span className="text-muted-foreground">{selectedType?.name || "Select a type"}</span>
+                    <span>{selectedType ? `$${selectedType.price.toFixed(2)}` : "--"}</span>
                   </div>
                   {uploadedImage && (
                     <div className="flex justify-between text-sm">
@@ -381,10 +395,76 @@ const Customize = () => {
                   variant="hero"
                   size="xl"
                   className="w-full"
-                  disabled={!selectedSize}
+                  disabled={!selectedSize || !selectedType || !selectedColor || isUploading}
+                  onClick={async () => {
+                    if (!selectedSize) {
+                      toast({
+                        title: "Error",
+                        description: "Please select a size",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    if (!selectedType || !selectedColor) {
+                      toast({
+                        title: "Error",
+                        description: "Please choose a t-shirt type and color",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    try {
+                      // Create FormData for file upload
+                      const formData = new FormData();
+                      
+                      // Add designId if editing
+                      if (designId) {
+                        formData.append("designId", designId);
+                      }
+                      
+                      formData.append("tshirt_type", selectedType.type_id);
+                      formData.append("tshirt_color", selectedColor.color_id);
+                      formData.append("size", selectedSize);
+                      formData.append("print_location", printLocation);
+                      formData.append("quantity", quantity.toString());
+                      formData.append("image_scale", imageScale[0].toString());
+                      formData.append("image_rotation", imageRotation[0].toString());
+
+                      // If there's a new uploaded file, add it to FormData
+                      if (uploadedFile) {
+                        formData.append("image", uploadedFile);
+                      } else if (uploadedImage && designId) {
+                        // If editing and no new file, pass existing image URL to backend
+                        formData.append("existing_image_url", uploadedImage);
+                      }
+
+                      // Upload the custom design - this saves it to the database
+                      const design = await uploadDesign(formData);
+
+                      toast({
+                        title: "Design saved!",
+                        description: `Your custom ${selectedType.name} design has been saved. You can purchase it from your profile.`,
+                      });
+
+                      // Reset the form after a short delay
+                      setTimeout(() => {
+                        clearImage();
+                        setSelectedSize("");
+                        setQuantity(1);
+                      }, 500);
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error.response?.data?.error || "Failed to save design",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
                 >
                   <ShoppingBag className="w-5 h-5 mr-2" />
-                  Add to Cart
+                  {isUploading ? "Saving..." : "Save Design"}
                 </Button>
 
                 {!selectedSize && (

@@ -3,13 +3,63 @@ import { Link } from "react-router-dom";
 import { Heart, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Product } from "@/data/products";
+import { useAddToCart } from "@/hooks/useCart";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProductCardProps {
-  product: Product;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+    originalPrice?: number;
+    image: string;
+    category: string;
+    collection: string;
+    colors: string[];
+    sizes: string[];
+    fit: string;
+    isNew?: boolean;
+    isBestseller?: boolean;
+  };
 }
 
 export const ProductCard = ({ product }: ProductCardProps) => {
+  const { mutateAsync: addToCart, isPending } = useAddToCart();
+  const { toast } = useToast();
+
+  const handleAdd = async () => {
+    const selected_size = product.sizes[0];
+    const selected_color = product.colors[0];
+    if (!selected_size || !selected_color) return;
+    try {
+      await addToCart({
+        product_id: product.id,
+        quantity: 1,
+        selected_size,
+        selected_color,
+      });
+      toast({
+        title: "Added to cart!",
+        description: `${product.name} has been added to your cart.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to add to cart",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toast({
+      title: "Added to wishlist!",
+      description: `${product.name} has been added to your wishlist.`,
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -42,11 +92,8 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             <Button
               size="icon"
               variant="secondary"
-              className="w-10 h-10 rounded-full shadow-soft bg-background/90 backdrop-blur-sm"
-              onClick={(e) => {
-                e.preventDefault();
-                // Add to wishlist logic
-              }}
+              className="w-10 h-10 rounded-full shadow-soft bg-background/90 backdrop-blur-sm hover:bg-coral hover:text-white transition-colors"
+              onClick={handleWishlist}
             >
               <Heart className="w-5 h-5" />
             </Button>
@@ -57,13 +104,15 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             <Button
               variant="hero"
               className="w-full"
+              disabled={isPending || product.sizes.length === 0 || product.colors.length === 0}
               onClick={(e) => {
                 e.preventDefault();
-                // Add to cart logic
+                e.stopPropagation();
+                handleAdd();
               }}
             >
               <ShoppingBag className="w-4 h-4 mr-2" />
-              Add to Cart
+              {isPending ? "Adding..." : "Add to Cart"}
             </Button>
           </div>
         </div>

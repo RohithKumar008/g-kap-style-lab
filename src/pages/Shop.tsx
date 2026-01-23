@@ -7,7 +7,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Layout } from "@/components/layout/Layout";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { products, categories, collections, colorOptions, sizeOptions, sortOptions } from "@/data/products";
+import { categories, collections, colorOptions, sizeOptions, sortOptions } from "@/data/products";
+import { useProducts } from "@/hooks/useProducts";
 
 const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -16,6 +17,26 @@ const Shop = () => {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("popular");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const { data: apiProducts = [], isLoading, error } = useProducts();
+
+  // Normalize API products to the existing card shape
+  const products = useMemo(() => {
+    return apiProducts.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      originalPrice: p.original_price,
+      image: p.image_url,
+      category: p.category,
+      collection: p.collection,
+      colors: p.colors || [],
+      sizes: p.sizes || [],
+      fit: p.fit,
+      isNew: p.is_new,
+      isBestseller: p.is_bestseller,
+    }));
+  }, [apiProducts]);
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
@@ -60,7 +81,7 @@ const Shop = () => {
     }
 
     return result;
-  }, [selectedCategory, selectedCollection, selectedColors, selectedSizes, sortBy]);
+  }, [products, selectedCategory, selectedCollection, selectedColors, selectedSizes, sortBy]);
 
   const toggleColor = (colorId: string) => {
     setSelectedColors((prev) =>
@@ -252,7 +273,7 @@ const Shop = () => {
                   </Sheet>
 
                   <p className="text-sm text-muted-foreground">
-                    {filteredProducts.length} products
+                    {isLoading ? "Loading products..." : `${filteredProducts.length} products`}
                   </p>
                 </div>
 
@@ -324,7 +345,13 @@ const Shop = () => {
               )}
 
               {/* Products Grid */}
-              {filteredProducts.length > 0 ? (
+              {isLoading ? (
+                <div className="text-center py-16 text-muted-foreground">Loading products...</div>
+              ) : error ? (
+                <div className="text-center py-16 text-destructive">
+                  Failed to load products. Please check the backend.
+                </div>
+              ) : filteredProducts.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                   {filteredProducts.map((product) => (
                     <ProductCard key={product.id} product={product} />
