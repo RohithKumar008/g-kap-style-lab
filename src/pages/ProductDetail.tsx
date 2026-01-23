@@ -1,0 +1,338 @@
+import { useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ArrowLeft, Heart, ShoppingBag, Truck, Shield, RefreshCw, Minus, Plus, Star, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Layout } from "@/components/layout/Layout";
+import { ProductCard } from "@/components/shop/ProductCard";
+import { products, colorOptions } from "@/data/products";
+
+const ProductDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  const product = products.find((p) => p.id === id);
+  
+  const [selectedColor, setSelectedColor] = useState(product?.colors[0] || "");
+  const [selectedSize, setSelectedSize] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [activeImage, setActiveImage] = useState(0);
+
+  if (!product) {
+    return (
+      <Layout>
+        <div className="section-container py-20 text-center">
+          <h1 className="text-2xl font-display font-bold mb-4">Product not found</h1>
+          <Link to="/shop">
+            <Button variant="hero">Back to Shop</Button>
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
+
+  const relatedProducts = products
+    .filter((p) => p.id !== product.id && p.collection === product.collection)
+    .slice(0, 4);
+
+  const getColorHex = (colorName: string) => {
+    return colorOptions.find((c) => c.id === colorName)?.hex || "#ccc";
+  };
+
+  return (
+    <Layout>
+      <div className="section-container py-8">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm mb-8">
+          <Link to="/" className="text-muted-foreground hover:text-primary">
+            Home
+          </Link>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <Link to="/shop" className="text-muted-foreground hover:text-primary">
+            Shop
+          </Link>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <span className="text-foreground">{product.name}</span>
+        </nav>
+
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Product Images */}
+          <div className="space-y-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted"
+            >
+              <img
+                src={product.image}
+                alt={product.name}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              {product.isNew && (
+                <Badge className="absolute top-4 left-4 bg-coral text-primary-foreground border-0">
+                  New Arrival
+                </Badge>
+              )}
+              {product.isBestseller && (
+                <Badge className="absolute top-4 left-4 bg-mint text-foreground border-0">
+                  Bestseller
+                </Badge>
+              )}
+            </motion.div>
+            
+            {/* Thumbnail gallery placeholder */}
+            <div className="flex gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveImage(i)}
+                  className={`relative aspect-square w-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                    activeImage === i ? "border-primary" : "border-transparent"
+                  }`}
+                >
+                  <img
+                    src={product.image}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Product Info */}
+          <div className="space-y-6">
+            <div>
+              <p className="text-muted-foreground mb-1">{product.fit}</p>
+              <h1 className="text-3xl md:text-4xl font-display font-bold mb-2">
+                {product.name}
+              </h1>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Star key={i} className="w-5 h-5 fill-sunflower text-sunflower" />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground">(48 reviews)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-3xl font-display font-bold">
+                ${product.price.toFixed(2)}
+              </span>
+              {product.originalPrice && (
+                <>
+                  <span className="text-xl text-muted-foreground line-through">
+                    ${product.originalPrice.toFixed(2)}
+                  </span>
+                  <Badge className="bg-destructive text-destructive-foreground">
+                    Save ${(product.originalPrice - product.price).toFixed(2)}
+                  </Badge>
+                </>
+              )}
+            </div>
+
+            {/* Color Selection */}
+            <div>
+              <p className="font-semibold mb-3">
+                Color: <span className="font-normal capitalize">{selectedColor}</span>
+              </p>
+              <div className="flex gap-2">
+                {product.colors.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setSelectedColor(color)}
+                    className={`w-10 h-10 rounded-full border-2 transition-all ${
+                      selectedColor === color
+                        ? "border-primary ring-2 ring-primary ring-offset-2"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    style={{ backgroundColor: getColorHex(color) }}
+                    title={color}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Size Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-semibold">Size</p>
+                <Link to="/size-guide" className="text-sm text-primary hover:underline">
+                  Size Guide
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setSelectedSize(size)}
+                    className={`px-5 py-3 rounded-lg border text-sm font-medium transition-colors ${
+                      selectedSize === size
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border hover:border-primary"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <p className="font-semibold mb-3">Quantity</p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center border rounded-lg">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="p-3 hover:bg-muted transition-colors"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="px-4 py-3 font-semibold min-w-[60px] text-center">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="p-3 hover:bg-muted transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Add to Cart */}
+            <div className="flex gap-3">
+              <Button
+                variant="hero"
+                size="xl"
+                className="flex-1"
+                disabled={!selectedSize}
+              >
+                <ShoppingBag className="w-5 h-5 mr-2" />
+                Add to Cart
+              </Button>
+              <Button variant="outline" size="xl">
+                <Heart className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {!selectedSize && (
+              <p className="text-sm text-destructive">Please select a size</p>
+            )}
+
+            {/* Trust badges */}
+            <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+              <div className="text-center">
+                <Truck className="w-6 h-6 mx-auto mb-1 text-mint" />
+                <p className="text-xs text-muted-foreground">Free Shipping $50+</p>
+              </div>
+              <div className="text-center">
+                <RefreshCw className="w-6 h-6 mx-auto mb-1 text-coral" />
+                <p className="text-xs text-muted-foreground">30-Day Returns</p>
+              </div>
+              <div className="text-center">
+                <Shield className="w-6 h-6 mx-auto mb-1 text-lavender" />
+                <p className="text-xs text-muted-foreground">Quality Guarantee</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Product Details Tabs */}
+        <div className="mt-16">
+          <Tabs defaultValue="description" className="w-full">
+            <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0">
+              <TabsTrigger
+                value="description"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                Description
+              </TabsTrigger>
+              <TabsTrigger
+                value="details"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                Fabric & Care
+              </TabsTrigger>
+              <TabsTrigger
+                value="shipping"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                Shipping
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="description" className="pt-6">
+              <div className="prose max-w-none">
+                <p className="text-muted-foreground">
+                  The {product.name} is crafted for those who want to make a statement. 
+                  Featuring premium DTG (Direct-to-Garment) printing technology, every detail 
+                  of the design comes through with vibrant, long-lasting colors.
+                </p>
+                <ul className="mt-4 space-y-2 text-muted-foreground">
+                  <li>• Premium 100% organic cotton</li>
+                  <li>• Pre-shrunk for a consistent fit</li>
+                  <li>• Reinforced double-stitched seams</li>
+                  <li>• Printed with eco-friendly inks</li>
+                  <li>• {product.fit} silhouette</li>
+                </ul>
+              </div>
+            </TabsContent>
+            <TabsContent value="details" className="pt-6">
+              <div className="prose max-w-none text-muted-foreground">
+                <h4 className="text-foreground font-semibold">Fabric Composition</h4>
+                <p>100% Organic Ring-Spun Cotton, 180 GSM</p>
+                
+                <h4 className="text-foreground font-semibold mt-4">Care Instructions</h4>
+                <ul className="space-y-1">
+                  <li>• Machine wash cold, inside out</li>
+                  <li>• Tumble dry low or hang dry</li>
+                  <li>• Do not bleach</li>
+                  <li>• Iron on reverse if needed</li>
+                  <li>• Do not dry clean</li>
+                </ul>
+              </div>
+            </TabsContent>
+            <TabsContent value="shipping" className="pt-6">
+              <div className="prose max-w-none text-muted-foreground">
+                <h4 className="text-foreground font-semibold">Delivery Time</h4>
+                <p>Standard shipping: 5-7 business days</p>
+                <p>Express shipping: 2-3 business days</p>
+                
+                <h4 className="text-foreground font-semibold mt-4">Free Shipping</h4>
+                <p>Orders over $50 qualify for free standard shipping.</p>
+                
+                <h4 className="text-foreground font-semibold mt-4">Returns</h4>
+                <p>30-day hassle-free returns. See our return policy for details.</p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Related Products */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-16">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-display font-bold">You May Also Like</h2>
+              <Link to="/shop">
+                <Button variant="ghost">
+                  View All <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {relatedProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </Layout>
+  );
+};
+
+export default ProductDetail;
