@@ -34,13 +34,30 @@ router.get('/', async (req: Request, res: Response) => {
       query = query.limit(Number(limit));
     }
 
-    const { data, error } = await query;
+    const { data: products, error } = await query;
 
     if (error) {
       return res.status(400).json({ error: error.message });
     }
 
-    res.json(data);
+    // Fetch all images for all products
+    const productIds = products?.map(p => p.id) || [];
+    const { data: images } = await supabase
+      .from('product_images')
+      .select('*')
+      .in('product_id', productIds)
+      .order('display_order', { ascending: true });
+
+    // Attach all images to each product
+    const productsWithImages = products?.map(product => {
+      const productImages = images?.filter(img => img.product_id === product.id) || [];
+      return {
+        ...product,
+        images: productImages
+      };
+    });
+
+    res.json(productsWithImages);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
   }
@@ -51,17 +68,31 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
+    // Fetch product
+    const { data: product, error: productError } = await supabase
       .from('products')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (error) {
+    if (productError) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    res.json(data);
+    // Fetch product images
+    const { data: images, error: imagesError } = await supabase
+      .from('product_images')
+      .select('*')
+      .eq('product_id', id)
+      .order('display_order', { ascending: true });
+
+    // Combine product with images
+    const productWithImages = {
+      ...product,
+      images: images || []
+    };
+
+    res.json(productWithImages);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch product' });
   }

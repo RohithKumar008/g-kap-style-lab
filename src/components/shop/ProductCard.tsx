@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Heart, ShoppingBag } from "lucide-react";
+import { Heart, ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAddToCart } from "@/hooks/useCart";
@@ -13,6 +14,7 @@ interface ProductCardProps {
     price: number;
     originalPrice?: number;
     image: string;
+    images?: Array<{ image_url: string; color?: string }>;
     category: string;
     collection: string;
     colors: string[];
@@ -26,6 +28,15 @@ interface ProductCardProps {
 export const ProductCard = ({ product }: ProductCardProps) => {
   const { mutateAsync: addToCart, isPending } = useAddToCart();
   const { toast } = useToast();
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Use images array if available, otherwise fallback to single image
+  const displayImages = product.images && product.images.length > 0 
+    ? product.images.map(img => img.image_url)
+    : [product.image];
+  
+  const currentImage = displayImages[currentImageIndex];
+  const hasMultipleImages = displayImages.length > 1;
 
   const handleAdd = async () => {
     const selected_size = product.sizes[0];
@@ -59,6 +70,22 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       description: `${product.name} has been added to your wishlist.`,
     });
   };
+  
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? displayImages.length - 1 : prev - 1
+    );
+  };
+  
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === displayImages.length - 1 ? 0 : prev + 1
+    );
+  };
 
   return (
     <motion.div
@@ -69,10 +96,46 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       <Link to={`/product/${product.id}`}>
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted mb-4 product-image-zoom">
           <img
-            src={product.image}
+            src={currentImage}
             alt={product.name}
             className="absolute inset-0 w-full h-full object-cover"
           />
+          
+          {/* Image carousel navigation */}
+          {hasMultipleImages && (
+            <>
+              <Button
+                size="icon"
+                variant="secondary"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handlePrevImage}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="secondary"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleNextImage}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              
+              {/* Image indicators */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                {displayImages.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      index === currentImageIndex 
+                        ? 'bg-white w-4' 
+                        : 'bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
           
           {/* Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-2">

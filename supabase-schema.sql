@@ -1,164 +1,151 @@
--- G-KAP E-commerce Database Schema for Supabase
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Products table
-CREATE TABLE products (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  description TEXT,
-  price DECIMAL(10, 2) NOT NULL,
-  original_price DECIMAL(10, 2),
-  image_url TEXT NOT NULL,
-  category TEXT NOT NULL,
-  collection TEXT NOT NULL,
-  colors TEXT[] NOT NULL DEFAULT '{}',
-  sizes TEXT[] NOT NULL DEFAULT '{}',
-  fit TEXT NOT NULL,
-  stock INTEGER DEFAULT 0,
-  is_new BOOLEAN DEFAULT false,
-  is_bestseller BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.cart_items (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  product_id uuid NOT NULL,
+  quantity integer NOT NULL DEFAULT 1,
+  selected_size text NOT NULL,
+  selected_color text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT cart_items_pkey PRIMARY KEY (id),
+  CONSTRAINT cart_items_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT cart_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.custom_designs (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  image_url text NOT NULL,
+  tshirt_type text NOT NULL,
+  tshirt_color text NOT NULL,
+  size text NOT NULL,
+  print_location text NOT NULL,
+  quantity integer NOT NULL DEFAULT 1,
+  image_scale numeric DEFAULT 1.0,
+  image_rotation numeric DEFAULT 0.0,
+  status text NOT NULL DEFAULT 'pending'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT custom_designs_pkey PRIMARY KEY (id),
+  CONSTRAINT custom_designs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.order_items (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  order_id uuid NOT NULL,
+  product_id uuid,
+  quantity integer NOT NULL,
+  size text NOT NULL,
+  color text NOT NULL,
+  price numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT order_items_pkey PRIMARY KEY (id),
+  CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.orders (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  order_number text NOT NULL UNIQUE,
+  status text NOT NULL DEFAULT 'pending'::text,
+  subtotal numeric NOT NULL,
+  shipping_cost numeric NOT NULL DEFAULT 0,
+  tax numeric NOT NULL DEFAULT 0,
+  total numeric NOT NULL,
+  shipping_address jsonb NOT NULL,
+  shipping_method text NOT NULL,
+  payment_method text NOT NULL,
+  payment_status text DEFAULT 'pending'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT orders_pkey PRIMARY KEY (id),
+  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.product_images (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  product_id uuid NOT NULL,
+  image_url text NOT NULL,
+  color text,
+  display_order integer DEFAULT 0,
+  alt_text text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT product_images_pkey PRIMARY KEY (id),
+  CONSTRAINT product_images_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE,
+  CONSTRAINT unique_product_display_order UNIQUE (product_id, display_order)
+);
+CREATE TABLE public.products (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  description text,
+  price numeric NOT NULL,
+  original_price numeric,
+  category text NOT NULL,
+  collection text NOT NULL,
+  colors ARRAY NOT NULL DEFAULT '{}'::text[],
+  sizes ARRAY NOT NULL DEFAULT '{}'::text[],
+  fit text NOT NULL,
+  stock integer DEFAULT 0,
+  is_new boolean DEFAULT false,
+  is_bestseller boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  free_shipping_threshold numeric DEFAULT 50.00,
+  return_days integer DEFAULT 30,
+  fabric_care text,
+  shipping_info text,
+  stock_quantity integer DEFAULT 0,
+  CONSTRAINT products_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.tshirt_colors (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  color_id text NOT NULL UNIQUE,
+  name text NOT NULL,
+  hex_code text NOT NULL,
+  is_active boolean DEFAULT true,
+  display_order integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT tshirt_colors_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.tshirt_types (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  type_id text NOT NULL UNIQUE,
+  name text NOT NULL,
+  price numeric NOT NULL,
+  description text,
+  image_url text,
+  is_active boolean DEFAULT true,
+  display_order integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT tshirt_types_pkey PRIMARY KEY (id)
 );
 
--- Cart items table
-CREATE TABLE cart_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  quantity INTEGER NOT NULL DEFAULT 1,
-  selected_size TEXT NOT NULL,
-  selected_color TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Orders table
-CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  order_number TEXT UNIQUE NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  subtotal DECIMAL(10, 2) NOT NULL,
-  shipping_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
-  tax DECIMAL(10, 2) NOT NULL DEFAULT 0,
-  total DECIMAL(10, 2) NOT NULL,
-  shipping_address JSONB NOT NULL,
-  shipping_method TEXT NOT NULL,
-  payment_method TEXT NOT NULL,
-  payment_status TEXT DEFAULT 'pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Order items table
-CREATE TABLE order_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES products(id),
-  quantity INTEGER NOT NULL,
-  size TEXT NOT NULL,
-  color TEXT NOT NULL,
-  price DECIMAL(10, 2) NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Custom designs table
-CREATE TABLE custom_designs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  image_url TEXT NOT NULL,
-  tshirt_type TEXT NOT NULL,
-  tshirt_color TEXT NOT NULL,
-  size TEXT NOT NULL,
-  print_location TEXT NOT NULL,
-  quantity INTEGER NOT NULL DEFAULT 1,
-  image_scale DECIMAL(5, 2) DEFAULT 1.0,
-  image_rotation DECIMAL(5, 2) DEFAULT 0.0,
-  status TEXT NOT NULL DEFAULT 'pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create indexes for better performance
-CREATE INDEX idx_products_category ON products(category);
-CREATE INDEX idx_products_collection ON products(collection);
-CREATE INDEX idx_cart_items_user ON cart_items(user_id);
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE INDEX idx_custom_designs_user ON custom_designs(user_id);
-
--- Auto-generate order number
-CREATE OR REPLACE FUNCTION generate_order_number()
+-- Validation function to ensure product_images.color matches products.colors array
+CREATE OR REPLACE FUNCTION public.validate_product_image_color()
 RETURNS TRIGGER AS $$
+DECLARE
+  valid_colors TEXT[];
 BEGIN
-  NEW.order_number := 'GK-' || UPPER(SUBSTR(MD5(RANDOM()::TEXT), 1, 8));
+  -- Get the valid colors for this product
+  SELECT colors INTO valid_colors FROM public.products WHERE id = NEW.product_id;
+  
+  -- Allow NULL color (applies to all color variants)
+  IF NEW.color IS NOT NULL AND NEW.color != '' THEN
+    -- Check if the color is in the valid colors array
+    IF NOT (NEW.color = ANY(valid_colors)) THEN
+      RAISE EXCEPTION 'Color "%" is not valid for this product. Valid colors: %', 
+        NEW.color, array_to_string(valid_colors, ', ');
+    END IF;
+  END IF;
+  
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER set_order_number
-BEFORE INSERT ON orders
-FOR EACH ROW
-EXECUTE FUNCTION generate_order_number();
-
--- Update timestamps
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_products_timestamp
-BEFORE UPDATE ON products
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_cart_items_timestamp
-BEFORE UPDATE ON cart_items
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_orders_timestamp
-BEFORE UPDATE ON orders
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_custom_designs_timestamp
-BEFORE UPDATE ON custom_designs
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at();
-
--- Row Level Security (RLS) Policies
-
--- Products are publicly readable
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Products are viewable by everyone" ON products FOR SELECT USING (true);
-
--- Cart items are private to the user
-ALTER TABLE cart_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own cart items" ON cart_items FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own cart items" ON cart_items FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own cart items" ON cart_items FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete their own cart items" ON cart_items FOR DELETE USING (auth.uid() = user_id);
-
--- Orders are private to the user
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own orders" ON orders FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create their own orders" ON orders FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Order items are viewable if the user owns the order
-ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own order items" ON order_items FOR SELECT 
-USING (EXISTS (SELECT 1 FROM orders WHERE orders.id = order_items.order_id AND orders.user_id = auth.uid()));
-
--- Custom designs are private to the user
-ALTER TABLE custom_designs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own designs" ON custom_designs FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own designs" ON custom_designs FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own designs" ON custom_designs FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete their own designs" ON custom_designs FOR DELETE USING (auth.uid() = user_id);
+-- Trigger to validate color before insert or update
+CREATE TRIGGER validate_image_color_trigger
+  BEFORE INSERT OR UPDATE ON public.product_images
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_product_image_color();

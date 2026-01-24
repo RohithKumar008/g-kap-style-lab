@@ -21,12 +21,19 @@ const ProductDetail = () => {
 
   const productData = useMemo(() => {
     if (!product) return null;
+    
+    // Get primary image from images array, fallback to first image
+    const primaryImage = product.images?.find((img: any) => img.is_primary)?.image_url 
+      || product.images?.[0]?.image_url 
+      || '/placeholder-product.svg';
+    
     return {
       id: product.id,
       name: product.name,
       price: product.price,
       originalPrice: product.original_price,
-      image: product.image_url,
+      image: primaryImage,
+      images: product.images || [],
       category: product.category,
       collection: product.collection,
       colors: product.colors || [],
@@ -34,6 +41,11 @@ const ProductDetail = () => {
       fit: product.fit,
       isNew: product.is_new,
       isBestseller: product.is_bestseller,
+      freeShippingThreshold: product.free_shipping_threshold || 50,
+      returnDays: product.return_days || 30,
+      description: product.description,
+      fabricCare: product.fabric_care,
+      shippingInfo: product.shipping_info,
     };
   }, [product]);
 
@@ -62,6 +74,21 @@ const ProductDetail = () => {
   const [selectedSize, setSelectedSize] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
+
+  // Filter images by selected color - only show images matching the selected color
+  const displayImages = useMemo(() => {
+    if (!productData || !productData.images.length) {
+      return [{ image_url: '/placeholder-product.svg' }];
+    }
+    
+    // Only show images that match the selected color exactly
+    const colorImages = productData.images.filter(
+      (img: any) => img.color === selectedColor
+    );
+    
+    // If no images for this color, show placeholder
+    return colorImages.length > 0 ? colorImages : [{ image_url: '/placeholder-product.svg' }];
+  }, [productData, selectedColor]);
 
   useEffect(() => {
     if (productData) {
@@ -124,7 +151,7 @@ const ProductDetail = () => {
               className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted"
             >
               <img
-                src={productData.image}
+                src={displayImages[activeImage]?.image_url || productData.image}
                 alt={productData.name}
                 className="absolute inset-0 w-full h-full object-cover"
               />
@@ -140,19 +167,19 @@ const ProductDetail = () => {
               )}
             </motion.div>
             
-            {/* Thumbnail gallery placeholder */}
-            <div className="flex gap-3">
-              {[0, 1, 2, 3].map((i) => (
+            {/* Thumbnail gallery */}
+            <div className="flex gap-3 overflow-x-auto">
+              {displayImages.map((img: any, i: number) => (
                 <button
                   key={i}
                   onClick={() => setActiveImage(i)}
-                  className={`relative aspect-square w-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                  className={`relative aspect-square w-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
                     activeImage === i ? "border-primary" : "border-transparent"
                   }`}
                 >
                   <img
-                    src={productData.image}
-                    alt=""
+                    src={img.image_url}
+                    alt={`View ${i + 1}`}
                     className="absolute inset-0 w-full h-full object-cover"
                   />
                 </button>
@@ -308,11 +335,15 @@ const ProductDetail = () => {
             <div className="grid grid-cols-3 gap-4 pt-4 border-t">
               <div className="text-center">
                 <Truck className="w-6 h-6 mx-auto mb-1 text-mint" />
-                <p className="text-xs text-muted-foreground">Free Shipping $50+</p>
+                <p className="text-xs text-muted-foreground">
+                  Free Shipping ${productData.freeShippingThreshold}+
+                </p>
               </div>
               <div className="text-center">
                 <RefreshCw className="w-6 h-6 mx-auto mb-1 text-coral" />
-                <p className="text-xs text-muted-foreground">30-Day Returns</p>
+                <p className="text-xs text-muted-foreground">
+                  {productData.returnDays}-Day Returns
+                </p>
               </div>
               <div className="text-center">
                 <Shield className="w-6 h-6 mx-auto mb-1 text-lavender" />
@@ -347,46 +378,47 @@ const ProductDetail = () => {
             </TabsList>
             <TabsContent value="description" className="pt-6">
               <div className="prose max-w-none">
-                <p className="text-muted-foreground">
-                  The {productData.name} is crafted for those who want to make a statement.
-                  Featuring premium DTG (Direct-to-Garment) printing technology, every detail
-                  of the design comes through with vibrant, long-lasting colors.
+                <p className="text-muted-foreground whitespace-pre-wrap">
+                  {productData.description || 
+                    `The ${productData.name} is crafted for those who want to make a statement. Featuring premium DTG (Direct-to-Garment) printing technology, every detail of the design comes through with vibrant, long-lasting colors.`
+                  }
                 </p>
-                <ul className="mt-4 space-y-2 text-muted-foreground">
-                  <li>• Premium 100% organic cotton</li>
-                  <li>• Pre-shrunk for a consistent fit</li>
-                  <li>• Reinforced double-stitched seams</li>
-                  <li>• Printed with eco-friendly inks</li>
-                  <li>• {productData.fit} silhouette</li>
-                </ul>
               </div>
             </TabsContent>
             <TabsContent value="details" className="pt-6">
-              <div className="prose max-w-none text-muted-foreground">
-                <h4 className="text-foreground font-semibold">Fabric Composition</h4>
-                <p>100% Organic Ring-Spun Cotton, 180 GSM</p>
-                
-                <h4 className="text-foreground font-semibold mt-4">Care Instructions</h4>
-                <ul className="space-y-1">
-                  <li>• Machine wash cold, inside out</li>
-                  <li>• Tumble dry low or hang dry</li>
-                  <li>• Do not bleach</li>
-                  <li>• Iron on reverse if needed</li>
-                  <li>• Do not dry clean</li>
-                </ul>
+              <div className="prose max-w-none text-muted-foreground whitespace-pre-wrap">
+                {productData.fabricCare || (
+                  <>
+                    <h4 className="text-foreground font-semibold">Fabric Composition</h4>
+                    <p>100% Organic Ring-Spun Cotton, 180 GSM</p>
+                    
+                    <h4 className="text-foreground font-semibold mt-4">Care Instructions</h4>
+                    <ul className="space-y-1">
+                      <li>• Machine wash cold, inside out</li>
+                      <li>• Tumble dry low or hang dry</li>
+                      <li>• Do not bleach</li>
+                      <li>• Iron on reverse if needed</li>
+                      <li>• Do not dry clean</li>
+                    </ul>
+                  </>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="shipping" className="pt-6">
-              <div className="prose max-w-none text-muted-foreground">
-                <h4 className="text-foreground font-semibold">Delivery Time</h4>
-                <p>Standard shipping: 5-7 business days</p>
-                <p>Express shipping: 2-3 business days</p>
-                
-                <h4 className="text-foreground font-semibold mt-4">Free Shipping</h4>
-                <p>Orders over $50 qualify for free standard shipping.</p>
-                
-                <h4 className="text-foreground font-semibold mt-4">Returns</h4>
-                <p>30-day hassle-free returns. See our return policy for details.</p>
+              <div className="prose max-w-none text-muted-foreground whitespace-pre-wrap">
+                {productData.shippingInfo || (
+                  <>
+                    <h4 className="text-foreground font-semibold">Delivery Time</h4>
+                    <p>Standard shipping: 5-7 business days</p>
+                    <p>Express shipping: 2-3 business days</p>
+                    
+                    <h4 className="text-foreground font-semibold mt-4">Free Shipping</h4>
+                    <p>Orders over ${productData.freeShippingThreshold} qualify for free standard shipping.</p>
+                    
+                    <h4 className="text-foreground font-semibold mt-4">Returns</h4>
+                    <p>{productData.returnDays}-day hassle-free returns. See our return policy for details.</p>
+                  </>
+                )}
               </div>
             </TabsContent>
           </Tabs>
