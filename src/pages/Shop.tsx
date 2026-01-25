@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Filter, SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Layout } from "@/components/layout/Layout";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { categories, collections, colorOptions, sizeOptions, sortOptions } from "@/data/products";
+import { sortOptions } from "@/data/products";
 import { useProducts } from "@/hooks/useProducts";
+import api from "@/config/api";
 
 const Shop = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -18,7 +19,29 @@ const Shop = () => {
   const [sortBy, setSortBy] = useState("popular");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Dynamic filter options from backend
+  const [categories, setCategories] = useState<string[]>([]);
+  const [collections, setCollections] = useState<string[]>([]);
+  const [colors, setColors] = useState<string[]>([]);
+  const [sizes, setSizes] = useState<string[]>([]);
+
   const { data: apiProducts = [], isLoading, error } = useProducts();
+
+  // Fetch filter options
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const response = await api.get('/products/filters');
+        setCategories(response.data.categories || []);
+        setCollections(response.data.collections || []);
+        setColors(response.data.colors || []);
+        setSizes(response.data.sizes || []);
+      } catch (err) {
+        console.error('Failed to fetch filters:', err);
+      }
+    };
+    fetchFilters();
+  }, []);
 
   // Normalize API products to the existing card shape
   const products = useMemo(() => {
@@ -81,7 +104,22 @@ const Shop = () => {
         result = result.filter((p) => p.isBestseller).concat(result.filter((p) => !p.isBestseller));
     }
 
-    return result;
+    // Expand products by color - create a card for each color variant
+    const expandedByColor: typeof result = [];
+    result.forEach(product => {
+      product.colors.forEach(color => {
+        // If color filters are applied, only include cards for selected colors
+        if (selectedColors.length > 0 && !selectedColors.includes(color)) {
+          return; // Skip this color variant
+        }
+        expandedByColor.push({
+          ...product,
+          selectedColor: color
+        });
+      });
+    });
+
+    return expandedByColor;
   }, [products, selectedCategory, selectedCollection, selectedColors, selectedSizes, sortBy]);
 
   const toggleColor = (colorId: string) => {
@@ -115,19 +153,29 @@ const Shop = () => {
     <div className="space-y-6">
       {/* Categories */}
       <div>
-        <h4 className="font-display font-semibold mb-3">T-Shirt Type</h4>
+        <h4 className="font-display font-semibold mb-3">Category</h4>
         <div className="space-y-2">
+          <button
+            onClick={() => setSelectedCategory("all")}
+            className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
+              selectedCategory === "all"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`}
+          >
+            All Products
+          </button>
           {categories.map((cat) => (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                selectedCategory === cat.id
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`block w-full text-left px-3 py-2 rounded-lg transition-colors capitalize ${
+                selectedCategory === cat
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted"
               }`}
             >
-              {cat.name}
+              {cat}
             </button>
           ))}
         </div>
@@ -137,17 +185,27 @@ const Shop = () => {
       <div>
         <h4 className="font-display font-semibold mb-3">Collection</h4>
         <div className="space-y-2">
+          <button
+            onClick={() => setSelectedCollection("all")}
+            className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
+              selectedCollection === "all"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`}
+          >
+            All Collections
+          </button>
           {collections.map((col) => (
             <button
-              key={col.id}
-              onClick={() => setSelectedCollection(col.id)}
-              className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                selectedCollection === col.id
+              key={col}
+              onClick={() => setSelectedCollection(col)}
+              className={`block w-full text-left px-3 py-2 rounded-lg transition-colors capitalize ${
+                selectedCollection === col
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted"
               }`}
             >
-              {col.name}
+              {col}
             </button>
           ))}
         </div>
@@ -156,19 +214,18 @@ const Shop = () => {
       {/* Colors */}
       <div>
         <h4 className="font-display font-semibold mb-3">Color</h4>
-        <div className="flex flex-wrap gap-2">
-          {colorOptions.map((color) => (
-            <button
-              key={color.id}
-              onClick={() => toggleColor(color.id)}
-              className={`w-8 h-8 rounded-full border-2 transition-all ${
-                selectedColors.includes(color.id)
-                  ? "border-primary ring-2 ring-primary ring-offset-2"
-                  : "border-border hover:border-primary/50"
-              }`}
-              style={{ backgroundColor: color.hex }}
-              title={color.name}
-            />
+        <div className="space-y-2">
+          {colors.map((color) => (
+            <label
+              key={color}
+              className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded-lg transition-colors"
+            >
+              <Checkbox
+                checked={selectedColors.includes(color)}
+                onCheckedChange={() => toggleColor(color)}
+              />
+              <span className="capitalize">{color}</span>
+            </label>
           ))}
         </div>
       </div>
@@ -177,7 +234,7 @@ const Shop = () => {
       <div>
         <h4 className="font-display font-semibold mb-3">Size</h4>
         <div className="flex flex-wrap gap-2">
-          {sizeOptions.map((size) => (
+          {sizes.map((size) => (
             <button
               key={size}
               onClick={() => toggleSize(size)}
@@ -301,9 +358,9 @@ const Shop = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => setSelectedCategory("all")}
-                      className="gap-1"
+                      className="gap-1 capitalize"
                     >
-                      {categories.find((c) => c.id === selectedCategory)?.name}
+                      {selectedCategory}
                       <X className="w-3 h-3" />
                     </Button>
                   )}
@@ -312,9 +369,9 @@ const Shop = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => setSelectedCollection("all")}
-                      className="gap-1"
+                      className="gap-1 capitalize"
                     >
-                      {collections.find((c) => c.id === selectedCollection)?.name}
+                      {selectedCollection}
                       <X className="w-3 h-3" />
                     </Button>
                   )}
@@ -324,9 +381,9 @@ const Shop = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => toggleColor(color)}
-                      className="gap-1"
+                      className="gap-1 capitalize"
                     >
-                      {colorOptions.find((c) => c.id === color)?.name}
+                      {color}
                       <X className="w-3 h-3" />
                     </Button>
                   ))}
@@ -355,7 +412,7 @@ const Shop = () => {
               ) : filteredProducts.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                   {filteredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <ProductCard key={`${product.id}-${product.selectedColor}`} product={product} selectedColor={product.selectedColor} />
                   ))}
                 </div>
               ) : (

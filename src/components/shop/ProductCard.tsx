@@ -23,24 +23,30 @@ interface ProductCardProps {
     isNew?: boolean;
     isBestseller?: boolean;
   };
+  selectedColor?: string;
 }
 
-export const ProductCard = ({ product }: ProductCardProps) => {
+export const ProductCard = ({ product, selectedColor }: ProductCardProps) => {
   const { mutateAsync: addToCart, isPending } = useAddToCart();
   const { toast } = useToast();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
-  // Use images array if available, otherwise fallback to single image
-  const displayImages = product.images && product.images.length > 0 
-    ? product.images.map(img => img.image_url)
-    : [product.image];
+  // Filter images by selectedColor if provided, otherwise use all images
+  const colorFilteredImages = selectedColor
+    ? product.images?.filter(img => img.color === selectedColor)
+    : product.images;
+  
+  // Only use images if they exist for this color, otherwise show placeholder
+  const displayImages = colorFilteredImages && colorFilteredImages.length > 0 
+    ? colorFilteredImages.map(img => img.image_url)
+    : ['/placeholder-product.svg'];
   
   const currentImage = displayImages[currentImageIndex];
-  const hasMultipleImages = displayImages.length > 1;
+  const hasMultipleImages = displayImages.length > 1 && displayImages[0] !== '/placeholder-product.svg';
 
   const handleAdd = async () => {
     const selected_size = product.sizes[0];
-    const selected_color = product.colors[0];
+    const selected_color = selectedColor || product.colors[0];
     if (!selected_size || !selected_color) return;
     try {
       await addToCart({
@@ -93,7 +99,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       animate={{ opacity: 1, y: 0 }}
       className="group"
     >
-      <Link to={`/product/${product.id}`}>
+      <Link to={`/product/${product.id}${selectedColor ? `?color=${encodeURIComponent(selectedColor)}` : ''}`}>
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted mb-4 product-image-zoom">
           <img
             src={currentImage}

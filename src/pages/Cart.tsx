@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck, ChevronRight } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck, ChevronRight, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 import { useCart, useUpdateCartItem, useRemoveFromCart, useClearCart } from "@/hooks/useCart";
@@ -40,11 +41,17 @@ const Cart = () => {
 
   const normalized = cartItems.map((item) => {
     const p = item.products;
+    // Filter images by selected color for this cart item
+    const colorImages = p?.images?.filter(
+      (img: any) => img.color === item.selected_color
+    ) || [];
+    
     return {
       id: item.id,
       productId: item.product_id,
       name: p?.name ?? "Item",
-      image: p?.image_url ?? "https://via.placeholder.com/300x400?text=Product",
+      image: colorImages[0]?.image_url ?? "/placeholder-product.svg",
+      images: colorImages,
       price: p?.price ?? 0,
       fit: p?.fit ?? "",
       selectedSize: item.selected_size,
@@ -117,61 +124,13 @@ const Cart = () => {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {normalized.map((item, index) => (
-              <motion.div
+              <CartItemCard
                 key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="flex gap-4 p-4 bg-card rounded-2xl shadow-soft"
-              >
-                <Link
-                  to={`/product/${item.productId}`}
-                  className="w-24 h-24 md:w-32 md:h-32 rounded-xl overflow-hidden bg-muted shrink-0"
-                >
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                </Link>
-
-                <div className="flex-1 flex flex-col">
-                  <div className="flex justify-between">
-                    <div>
-                      <Link to={`/product/${item.productId}`} className="font-semibold hover:text-primary transition-colors">
-                        {item.name}
-                      </Link>
-                      <p className="text-sm text-muted-foreground">Size: {item.selectedSize} • Color: {item.selectedColor}</p>
-                    </div>
-                    <button
-                      onClick={() => handleRemove(item.id)}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-end justify-between mt-auto">
-                    <div className="flex items-center border rounded-lg">
-                      <button
-                        onClick={() => handleUpdateQty(item.id, item.quantity - 1)}
-                        className="p-2 hover:bg-muted transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="px-3 py-2 font-semibold min-w-[40px] text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
-                        className="p-2 hover:bg-muted transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display font-bold text-lg">${(item.price * item.quantity).toFixed(2)}</p>
-                      {item.quantity > 1 && (
-                        <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+                item={item}
+                index={index}
+                onUpdateQty={handleUpdateQty}
+                onRemove={handleRemove}
+              />
             ))}
 
             <div className="pt-4 flex flex-wrap gap-3">
@@ -219,6 +178,144 @@ const Cart = () => {
         </div>
       </div>
     </Layout>
+  );
+};
+
+// Cart Item Card Component with Image Carousel
+interface CartItemCardProps {
+  item: {
+    id: string;
+    productId: string;
+    name: string;
+    image: string;
+    images: Array<{ image_url: string }>;
+    price: number;
+    fit: string;
+    selectedSize: string;
+    selectedColor: string;
+    quantity: number;
+  };
+  index: number;
+  onUpdateQty: (id: string, quantity: number) => void;
+  onRemove: (id: string) => void;
+}
+
+const CartItemCard = ({ item, index, onUpdateQty, onRemove }: CartItemCardProps) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  const displayImages = item.images && item.images.length > 0 
+    ? item.images.map(img => img.image_url)
+    : [item.image];
+  
+  const currentImage = displayImages[currentImageIndex];
+  const hasMultipleImages = displayImages.length > 1;
+  
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? displayImages.length - 1 : prev - 1
+    );
+  };
+  
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === displayImages.length - 1 ? 0 : prev + 1
+    );
+  };
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="flex gap-4 p-4 bg-card rounded-2xl shadow-soft"
+    >
+      <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-xl overflow-hidden bg-muted shrink-0 group">
+        <Link to={`/product/${item.productId}`}>
+          <img src={currentImage} alt={item.name} className="w-full h-full object-cover" />
+        </Link>
+        
+        {/* Carousel navigation */}
+        {hasMultipleImages && (
+          <>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full shadow-md bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity p-0"
+              onClick={handlePrevImage}
+            >
+              <ChevronLeft className="w-3 h-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full shadow-md bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity p-0"
+              onClick={handleNextImage}
+            >
+              <ChevronRight className="w-3 h-3" />
+            </Button>
+            
+            {/* Image indicators */}
+            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+              {displayImages.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`w-1 h-1 rounded-full transition-all ${
+                    idx === currentImageIndex 
+                      ? 'bg-white w-2' 
+                      : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        <div className="flex justify-between">
+          <div>
+            <Link to={`/product/${item.productId}`} className="font-semibold hover:text-primary transition-colors">
+              {item.name}
+            </Link>
+            <p className="text-sm text-muted-foreground">Size: {item.selectedSize} • Color: {item.selectedColor}</p>
+          </div>
+          <button
+            onClick={() => onRemove(item.id)}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex items-end justify-between mt-auto">
+          <div className="flex items-center border rounded-lg">
+            <button
+              onClick={() => onUpdateQty(item.id, item.quantity - 1)}
+              className="p-2 hover:bg-muted transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-2 font-semibold min-w-[40px] text-center">{item.quantity}</span>
+            <button
+              onClick={() => onUpdateQty(item.id, item.quantity + 1)}
+              className="p-2 hover:bg-muted transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="text-right">
+            <p className="font-display font-bold text-lg">${(item.price * item.quantity).toFixed(2)}</p>
+            {item.quantity > 1 && (
+              <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 };
 

@@ -21,7 +21,24 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
 
-    res.json(data);
+    // Fetch images for all products in cart
+    const productIds = data?.map(item => item.product_id) || [];
+    const { data: images } = await supabase
+      .from('product_images')
+      .select('*')
+      .in('product_id', productIds)
+      .order('display_order', { ascending: true });
+
+    // Attach images to each cart item's product
+    const cartWithImages = data?.map(item => ({
+      ...item,
+      products: {
+        ...item.products,
+        images: images?.filter(img => img.product_id === item.product_id) || []
+      }
+    }));
+
+    res.json(cartWithImages);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch cart' });
   }

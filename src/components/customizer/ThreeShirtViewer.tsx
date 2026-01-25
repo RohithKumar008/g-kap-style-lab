@@ -1,14 +1,17 @@
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
   Environment,
   OrbitControls,
   ContactShadows,
   Html,
-  Decal,
   useTexture,
+  useGLTF,
+  Decal,
 } from "@react-three/drei";
 import * as THREE from "three";
+import { Maximize2, Minimize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ThreeShirtViewerProps {
   colorHex?: string;
@@ -16,6 +19,11 @@ interface ThreeShirtViewerProps {
   printLocation?: "front" | "back";
   logoScale?: number;
   logoRotation?: number; // degrees
+  modelUrl?: string; // glb model path, e.g., /models/tshirt.glb
+  textureUrl?: string | null; // composited texture from canvas
+  userTemplate?: string | null;
+  sideImages?: Partial<Record<"front" | "back" | "left" | "right", string | null>>;
+  showReferenceTemplate?: boolean;
 }
 
 const transparentPixel =
@@ -27,116 +35,54 @@ const ShirtMesh = ({
   printLocation = "front",
   logoScale = 1,
   logoRotation = 0,
+  modelUrl = "/models/tshirt.glb",
+  textureUrl,
 }: ThreeShirtViewerProps) => {
   const baseColor = colorHex || "#f5f5f5";
 
-  // Use a transparent placeholder so the hook never fails when no logo exists
-  const decalTexture = useTexture(logoUrl || transparentPixel);
-  decalTexture.flipY = true; // keep upright from file uploads
-  decalTexture.colorSpace = THREE.SRGBColorSpace;
+  // Load GLB model
+  const shirtRef = useRef<THREE.Mesh>(null);
 
-  const decalPosition = useMemo(
-    () => new THREE.Vector3(0, 0.25, printLocation === "front" ? 0.32 : -0.32),
-    [printLocation]
-  );
+  const { scene } = useGLTF(modelUrl);
 
-  const decalRotation = useMemo(() => {
-    const zRot = THREE.MathUtils.degToRad(logoRotation || 0);
-    return printLocation === "front"
-      ? [0, 0, zRot]
-      : [0, Math.PI, zRot];
-  }, [printLocation, logoRotation]);
+  // Load composited texture if available
+  const texture = useTexture(textureUrl || transparentPixel);
+  texture.flipY = false; // GLB UVs are already correct
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+
+  // Apply texture or base color to materials
+  useEffect(() => {
+    if (!scene) return;
+    scene.traverse((child: any) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material = child.material.clone();
+          
+          // Apply composited texture if available
+          if (textureUrl) {
+            // Set texture and ensure no unintended tinting
+            child.material.map = texture;
+            child.material.color = new THREE.Color('#ffffff');
+          } else {
+            // Clear any previous texture and set base color
+            child.material.map = null;
+            child.material.color = new THREE.Color(baseColor);
+          }
+          
+          if (child.material.roughness === undefined) child.material.roughness = 0.6;
+          if (child.material.metalness === undefined) child.material.metalness = 0.05;
+          child.material.needsUpdate = true;
+        }
+      }
+    });
+  }, [scene, baseColor, textureUrl, texture]);
 
   return (
-    <group position={[0, -0.1, 0]}>
-      {/* Main Torso - tall rectangular body */}
-      <mesh castShadow receiveShadow position={[0, 0, 0]}>
-        <boxGeometry args={[0.72, 1.2, 0.3]} />
-        <meshPhysicalMaterial
-          color={baseColor}
-          roughness={0.7}
-          metalness={0.05}
-          clearcoat={0.4}
-          clearcoatRoughness={0.2}
-        />
-        {logoUrl ? (
-          <Decal
-            position={decalPosition}
-            rotation={decalRotation as [number, number, number]}
-            scale={[0.6 * logoScale, 0.6 * logoScale, 0.6 * logoScale]}
-            map={decalTexture}
-          />
-        ) : null}
-      </mesh>
-
-      {/* Left Shoulder - rounded cap */}
-      <mesh castShadow receiveShadow position={[-0.36, 0.55, 0]}>
-        <sphereGeometry args={[0.15, 16, 16]} />
-        <meshPhysicalMaterial
-          color={baseColor}
-          roughness={0.7}
-          metalness={0.05}
-          clearcoat={0.4}
-          clearcoatRoughness={0.2}
-        />
-      </mesh>
-
-      {/* Right Shoulder - rounded cap */}
-      <mesh castShadow receiveShadow position={[0.36, 0.55, 0]}>
-        <sphereGeometry args={[0.15, 16, 16]} />
-        <meshPhysicalMaterial
-          color={baseColor}
-          roughness={0.7}
-          metalness={0.05}
-          clearcoat={0.4}
-          clearcoatRoughness={0.2}
-        />
-      </mesh>
-
-      {/* Left Sleeve */}
-      <mesh
-        castShadow
-        receiveShadow
-        position={[-0.55, 0.55, 0]}
-        rotation={[0, 0, 0.15]}
-      >
-        <cylinderGeometry args={[0.12, 0.11, 0.55, 16, 4]} />
-        <meshPhysicalMaterial
-          color={baseColor}
-          roughness={0.7}
-          metalness={0.05}
-          clearcoat={0.35}
-          clearcoatRoughness={0.25}
-        />
-      </mesh>
-
-      {/* Right Sleeve */}
-      <mesh
-        castShadow
-        receiveShadow
-        position={[0.55, 0.55, 0]}
-        rotation={[0, 0, -0.15]}
-      >
-        <cylinderGeometry args={[0.12, 0.11, 0.55, 16, 4]} />
-        <meshPhysicalMaterial
-          color={baseColor}
-          roughness={0.7}
-          metalness={0.05}
-          clearcoat={0.35}
-          clearcoatRoughness={0.25}
-        />
-      </mesh>
-
-      {/* Collar cutout sphere (subtle neck) */}
-      <mesh castShadow receiveShadow position={[0, 0.57, 0.15]}>
-        <sphereGeometry args={[0.12, 12, 12]} />
-        <meshPhysicalMaterial
-          color={baseColor}
-          roughness={0.75}
-          metalness={0.02}
-        />
-      </mesh>
-
+    <group position={[0, -0.5, 0]} scale={[0.6, 0.6, 0.6]}>
+      <primitive object={scene} />
       <ContactShadows
         position={[0, -1, 0]}
         opacity={0.35}
@@ -154,13 +100,61 @@ export const ThreeShirtViewer = ({
   printLocation = "front",
   logoScale,
   logoRotation,
+  modelUrl,
+  userTemplate,
+  sideImages,
+  showReferenceTemplate,
+  textureUrl,
 }: ThreeShirtViewerProps) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Use provided textureUrl directly (Customize component handles generation)
+  const composedTextureUrl = textureUrl || null;
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   return (
-    <div className="relative w-full h-[520px] rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-large">
+    <div 
+      ref={containerRef}
+      className={`relative w-full rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-large ${
+        isFullscreen ? 'h-screen' : 'h-[520px]'
+      }`}
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleFullscreen}
+        className="absolute top-4 right-4 z-10 bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm"
+      >
+        {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+      </Button>
+
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, 1.2, 3], fov: 42 }}
+        camera={{ position: [0, 0.8, 3.5], fov: 45 }}
       >
         <color attach="background" args={["#0f172a"]} />
         <ambientLight intensity={0.5} />
@@ -188,11 +182,13 @@ export const ThreeShirtViewer = ({
             printLocation={printLocation}
             logoScale={logoScale}
             logoRotation={logoRotation}
+            modelUrl={modelUrl}
+            textureUrl={composedTextureUrl}
           />
           <Environment preset="city" />
         </Suspense>
 
-        <OrbitControls enablePan={false} minDistance={2.1} maxDistance={4} />
+        <OrbitControls enablePan={false} minDistance={2} maxDistance={6} />
       </Canvas>
 
       {!logoUrl && (
@@ -205,3 +201,6 @@ export const ThreeShirtViewer = ({
 };
 
 export default ThreeShirtViewer;
+
+// Preload default model to speed up first render
+useGLTF.preload("/models/tshirt.glb");

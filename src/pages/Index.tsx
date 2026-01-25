@@ -172,7 +172,7 @@ const Index = () => {
                       <Star key={i} className="w-4 h-4 fill-sunflower text-sunflower" />
                     ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">5,000+ happy creators</p>
+                  <p className="text-sm text-muted-foreground">Trusted by creative minds worldwide</p>
                 </div>
               </motion.div>
             </motion.div>

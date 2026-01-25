@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, RotateCcw, Trash2, ShoppingBag, Sparkles, Check } from "lucide-react";
+import { Upload, RotateCcw, Trash2, ShoppingBag, Sparkles, Check, Download } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -28,16 +28,14 @@ const Customize = () => {
   const [selectedColor, setSelectedColor] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState("");
   const [printLocation, setPrintLocation] = useState("front");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [imageScale, setImageScale] = useState([1]);
-  const [imageRotation, setImageRotation] = useState([0]);
   const [quantity, setQuantity] = useState(1);
   const [isLoadingDesign, setIsLoadingDesign] = useState(!!designId);
+  const [sideImages, setSideImages] = useState({ front: "", back: "", left: "", right: "" });
+  const [showReferenceTemplate, setShowReferenceTemplate] = useState(false);
+  const [composedTexture, setComposedTexture] = useState<string | null>(null);
 
   const { mutateAsync: uploadDesign, isPending: isUploading } = useUploadDesign();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load design if editing
   useEffect(() => {
@@ -49,14 +47,7 @@ const Customize = () => {
           const design = res.data;
           setSelectedSize(design.size || "");
           setPrintLocation(design.print_location || "front");
-          setImageScale([design.image_scale || 1]);
-          setImageRotation([design.image_rotation || 0]);
           setQuantity(design.quantity || 1);
-          
-          // Set uploaded image from design
-          if (design.image_url) {
-            setUploadedImage(design.image_url);
-          }
           
           // Find and set type/color from database values
           if (design.tshirt_type && tshirtTypes.length > 0) {
@@ -95,29 +86,180 @@ const Customize = () => {
     }
   }, [selectedColor, tshirtColors]);
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUploadedImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+  // Generate composite texture with support for reference template
+  useEffect(() => {
+    const hasImages = !!(sideImages.front || sideImages.back || sideImages.left || sideImages.right);
+    
+    if (!hasImages) {
+      setComposedTexture(null);
+      return;
     }
+
+    try {
+      const baseColor = selectedColor?.hex_code || "#f5f5f5";
+      const canvas = document.createElement("canvas");
+      canvas.width = 2048;
+      canvas.height = 2048;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) return;
+
+      // Fill with base color
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Load reference template if needed
+      if (showReferenceTemplate) {
+        const refImg = new Image();
+        refImg.onload = () => {
+          ctx.save();
+          ctx.globalAlpha = 0.35;
+          ctx.drawImage(refImg, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+          drawImages();
+        };
+        refImg.onerror = () => drawImages();
+        refImg.src = "/models/Template.png";
+      } else {
+        drawImages();
+      }
+
+      function drawImages() {
+        // Zones for image placement - coordinates from user testing
+        const zones = {
+          front: { x: canvas.width * 0.095, y: canvas.height * 0.18, width: canvas.width * 0.35, height: canvas.height * 0.40 },
+          back: { x: canvas.width * 0.58, y: canvas.height * 0.18, width: canvas.width * 0.35, height: canvas.height * 0.40 },
+          left: { x: canvas.width * 0.10, y: canvas.height * 0.76, width: canvas.width * 0.17, height: canvas.height * 0.10 },
+          right: { x: canvas.width * 0.59, y: canvas.height * 0.76, width: canvas.width * 0.17, height: canvas.height * 0.10 },
+        };
+
+        let imagesLoaded = 0;
+        const totalImages = Object.values(sideImages).filter(v => v).length;
+
+        const drawImage = (src: string, zone: any) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              // Maintain aspect ratio - scale to fit zone
+              const aspect = img.width / img.height;
+              let w = zone.width;
+              let h = w / aspect;
+              if (h > zone.height) {
+                h = zone.height;
+                w = h * aspect;
+              }
+              const dx = zone.x + (zone.width - w) / 2;
+              const dy = zone.y + (zone.height - h) / 2;
+              ctx.drawImage(img, dx, dy, w, h);
+            } catch (e) {
+              console.warn("Draw error:", e);
+            }
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+              setComposedTexture(canvas.toDataURL("image/png"));
+            }
+          };
+          img.onerror = () => {
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+              setComposedTexture(canvas.toDataURL("image/png"));
+            }
+          };
+          img.src = src;
+        };
+
+        if (sideImages.front) drawImage(sideImages.front, zones.front);
+        if (sideImages.back) drawImage(sideImages.back, zones.back);
+        if (sideImages.left) drawImage(sideImages.left, zones.left);
+        if (sideImages.right) drawImage(sideImages.right, zones.right);
+      }
+
+    } catch (error) {
+      console.error("Texture error:", error);
+      setComposedTexture(null);
+    }
+  }, [sideImages, selectedColor?.hex_code, showReferenceTemplate]);
+
+  const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({
+    front: null,
+    back: null,
+    left: null,
+    right: null,
+  });
+
+  const handleSideUpload = useCallback((side: "front" | "back" | "left" | "right") => {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          setSideImages((prev) => ({
+            ...prev,
+            [side]: dataUrl,
+          }));
+        };
+        reader.readAsDataURL(file);
+      }
+    };
   }, []);
 
-  const clearImage = () => {
-    setUploadedImage(null);
-    setUploadedFile(null);
-    setImageScale([1]);
-    setImageRotation([0]);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  const clearSide = (side: "front" | "back" | "left" | "right") => {
+    setSideImages((prev) => ({
+      ...prev,
+      [side]: "",
+    }));
+    if (fileInputsRef.current[side]) {
+      fileInputsRef.current[side]!.value = "";
     }
   };
 
-  const printPrice = uploadedImage ? 10 : 0;
+  const clearAllImages = () => {
+    setSideImages({ front: "", back: "", left: "", right: "" });
+    Object.values(fileInputsRef.current).forEach((input) => {
+      if (input) input.value = "";
+    });
+  };
+
+  const downloadCompositeTexture = () => {
+    if (!composedTexture) {
+      toast({
+        title: "Error",
+        description: "No composite texture to download. Please upload at least one image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = composedTexture;
+    link.download = "shirt-texture-composite.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Downloaded!",
+      description: "Composite texture saved to your downloads folder.",
+    });
+  };
+
+  const hasAnySideImage = !!(sideImages.front || sideImages.back || sideImages.left || sideImages.right);
+
+  const dataUrlToFile = (dataUrl: string, filename: string) => {
+    const [meta, content] = dataUrl.split(",");
+    const mimeMatch = meta.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/png";
+    const binary = atob(content);
+    const len = binary.length;
+    const u8 = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      u8[i] = binary.charCodeAt(i);
+    }
+    return new File([u8], filename, { type: mime });
+  };
+
+  const printPrice = hasAnySideImage ? 10 : 0;
   const totalPrice = selectedType ? (selectedType.price + printPrice) * quantity : 0;
 
   return (
@@ -161,112 +303,91 @@ const Customize = () => {
               <div className="sticky top-24">
                 <ThreeShirtViewer
                   colorHex={selectedColor?.hex_code}
-                  logoUrl={uploadedImage}
+                  textureUrl={composedTexture}
+                  sideImages={sideImages}
+                  showReferenceTemplate={showReferenceTemplate}
                   printLocation={printLocation as "front" | "back"}
-                  logoScale={imageScale[0]}
-                  logoRotation={imageRotation[0]}
                 />
-
-                {/* Print Location Toggle */}
-                <div className="flex gap-2 mt-4">
-                  {printLocations.map((loc) => (
-                    <button
-                      key={loc.id}
-                      onClick={() => setPrintLocation(loc.id)}
-                      className={`flex-1 py-3 rounded-lg border font-medium transition-colors ${
-                        printLocation === loc.id
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border hover:border-primary"
-                      }`}
-                    >
-                      {loc.name}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
             {/* Customization Options */}
             <div className="space-y-8">
               {/* Upload Section */}
-              <div className="bg-card rounded-2xl p-6 shadow-soft">
-                <h3 className="font-display font-bold text-lg mb-4">Upload Your Design</h3>
-                
-                {!uploadedImage ? (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
-                  >
-                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="font-semibold mb-1">Click to upload or drag and drop</p>
-                    <p className="text-sm text-muted-foreground">PNG, JPG, SVG up to 10MB</p>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
+              <div className="bg-card rounded-2xl p-6 shadow-soft space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-display font-bold text-lg">Upload Your Design</h3>
+                    <p className="text-sm text-muted-foreground">Upload up to four images: front, back, left sleeve, right sleeve.</p>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 p-4 bg-muted rounded-xl">
-                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-background">
-                        <img
-                          src={uploadedImage}
-                          alt="Uploaded design"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold">Design uploaded</p>
-                        <p className="text-sm text-muted-foreground">+$10.00 for custom print</p>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={clearImage}>
-                        <Trash2 className="w-5 h-5 text-destructive" />
-                      </Button>
-                    </div>
+                  {hasAnySideImage && (
+                    <Button variant="ghost" size="sm" onClick={clearAllImages}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Clear all
+                    </Button>
+                  )}
+                </div>
 
-                    {/* Image Controls */}
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium">Size</label>
-                          <span className="text-sm text-muted-foreground">{Math.round(imageScale[0] * 100)}%</span>
-                        </div>
-                        <Slider
-                          value={imageScale}
-                          onValueChange={setImageScale}
-                          min={0.5}
-                          max={2}
-                          step={0.1}
-                          className="w-full"
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { key: "front", label: "Front" },
+                    { key: "back", label: "Back" },
+                    { key: "left", label: "Left Sleeve" },
+                    { key: "right", label: "Right Sleeve" },
+                  ].map((slot) => {
+                    const value = sideImages[slot.key as keyof typeof sideImages];
+                    return (
+                      <div
+                        key={slot.key}
+                        onClick={() => fileInputsRef.current[slot.key as keyof typeof fileInputsRef.current]?.click()}
+                        className="border-2 border-dashed border-border rounded-xl p-4 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors relative"
+                      >
+                        <p className="font-semibold mb-2">{slot.label}</p>
+                        {value ? (
+                          <div className="relative w-full aspect-[4/5] rounded-lg overflow-hidden bg-background">
+                            <img src={value} alt={`${slot.label} upload`} className="w-full h-full object-contain" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); clearSide(slot.key as any); }}
+                              className="absolute top-2 right-2 bg-black/50 hover:bg-black/70"
+                            >
+                              <Trash2 className="w-4 h-4 text-white" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                            <Upload className="w-8 h-8 mb-2" />
+                            <span className="text-sm">Upload {slot.label}</span>
+                          </div>
+                        )}
+                        <input
+                          ref={(el) => (fileInputsRef.current[slot.key as keyof typeof fileInputsRef.current] = el)}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleSideUpload(slot.key as any)}
+                          className="hidden"
                         />
                       </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium">Rotation</label>
-                          <span className="text-sm text-muted-foreground">{imageRotation[0]}°</span>
-                        </div>
-                        <Slider
-                          value={imageRotation}
-                          onValueChange={setImageRotation}
-                          min={-180}
-                          max={180}
-                          step={1}
-                          className="w-full"
-                        />
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => {
-                        setImageScale([1]);
-                        setImageRotation([0]);
-                      }}>
-                        <RotateCcw className="w-4 h-4 mr-2" />
-                        Reset Position
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center">
+                  {hasAnySideImage && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={downloadCompositeTexture}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Texture
+                    </Button>
+                  )}
+                  {!hasAnySideImage && (
+                    <span className="text-sm text-muted-foreground">Upload at least one image to personalize the shirt.</span>
+                  )}
+                </div>
               </div>
 
               {/* T-shirt Type */}
@@ -372,7 +493,7 @@ const Customize = () => {
                     <span className="text-muted-foreground">{selectedType?.name || "Select a type"}</span>
                     <span>{selectedType ? `$${selectedType.price.toFixed(2)}` : "--"}</span>
                   </div>
-                  {uploadedImage && (
+                  {hasAnySideImage && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Custom Print</span>
                       <span>+$10.00</span>
@@ -429,15 +550,20 @@ const Customize = () => {
                       formData.append("size", selectedSize);
                       formData.append("print_location", printLocation);
                       formData.append("quantity", quantity.toString());
-                      formData.append("image_scale", imageScale[0].toString());
-                      formData.append("image_rotation", imageRotation[0].toString());
 
-                      // If there's a new uploaded file, add it to FormData
-                      if (uploadedFile) {
-                        formData.append("image", uploadedFile);
-                      } else if (uploadedImage && designId) {
-                        // If editing and no new file, pass existing image URL to backend
-                        formData.append("existing_image_url", uploadedImage);
+                      // If composited texture exists, convert to file and upload
+                      if (composedTexture && hasAnySideImage) {
+                        const arr = composedTexture.split(",");
+                        const mimeMatch = arr[0].match(/:(.*?);/);
+                        const mime = mimeMatch ? mimeMatch[1] : "image/png";
+                        const bstr = atob(arr[1]);
+                        let n = bstr.length;
+                        const u8 = new Uint8Array(n);
+                        while (n--) {
+                          u8[n] = bstr.charCodeAt(n);
+                        }
+                        const composedFile = new File([u8], "custom-design.png", { type: mime });
+                        formData.append("image", composedFile);
                       }
 
                       // Upload the custom design - this saves it to the database
@@ -450,7 +576,7 @@ const Customize = () => {
 
                       // Reset the form after a short delay
                       setTimeout(() => {
-                        clearImage();
+                        clearAllImages();
                         setSelectedSize("");
                         setQuantity(1);
                       }, 500);

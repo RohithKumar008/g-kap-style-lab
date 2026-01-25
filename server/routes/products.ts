@@ -3,6 +3,41 @@ import { supabase } from '../config/supabase';
 
 const router = Router();
 
+// Get filter options (categories, collections, colors, sizes)
+router.get('/filters', async (req: Request, res: Response) => {
+  try {
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('category, collection, colors, sizes');
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Extract unique values
+    const categories = new Set<string>();
+    const collections = new Set<string>();
+    const colors = new Set<string>();
+    const sizes = new Set<string>();
+
+    products?.forEach(product => {
+      if (product.category) categories.add(product.category);
+      if (product.collection) collections.add(product.collection);
+      product.colors?.forEach((c: string) => colors.add(c));
+      product.sizes?.forEach((s: string) => sizes.add(s));
+    });
+
+    res.json({
+      categories: Array.from(categories).sort(),
+      collections: Array.from(collections).sort(),
+      colors: Array.from(colors).sort(),
+      sizes: Array.from(sizes).sort()
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch filter options' });
+  }
+});
+
 // Get all products with filters
 router.get('/', async (req: Request, res: Response) => {
   try {

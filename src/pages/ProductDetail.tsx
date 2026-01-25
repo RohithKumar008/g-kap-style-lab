@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Heart, ShoppingBag, Truck, Shield, RefreshCw, Minus, Plus, Star, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Layout } from "@/components/layout/Layout";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { colorOptions } from "@/data/products";
 import { useProduct, useProducts } from "@/hooks/useProducts";
 import { useAddToCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const urlColor = searchParams.get('color');
   const { data: product, isLoading, error } = useProduct(id || "");
   const { data: allProducts = [] } = useProducts();
   const { mutateAsync: addToCart, isPending } = useAddToCart();
@@ -75,7 +76,7 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
-  // Filter images by selected color - only show images matching the selected color
+  // Filter images by selected color
   const displayImages = useMemo(() => {
     if (!productData || !productData.images.length) {
       return [{ image_url: '/placeholder-product.svg' }];
@@ -92,12 +93,12 @@ const ProductDetail = () => {
 
   useEffect(() => {
     if (productData) {
-      setSelectedColor(productData.colors[0] || "");
+      setSelectedColor(urlColor || productData.colors[0] || "");
       setSelectedSize("");
       setQuantity(1);
       setActiveImage(0);
     }
-  }, [productData]);
+  }, [productData, urlColor]);
 
   if (isLoading) {
     return (
@@ -123,7 +124,31 @@ const ProductDetail = () => {
   }
 
   const getColorHex = (colorName: string) => {
-    return colorOptions.find((c) => c.id === colorName)?.hex || "#ccc";
+    const colorMap: Record<string, string> = {
+      white: "#FFFFFF",
+      black: "#1a1a1a",
+      gray: "#6B7280",
+      grey: "#6B7280",
+      navy: "#1e3a5f",
+      red: "#EF4444",
+      blue: "#3B82F6",
+      green: "#10B981",
+      yellow: "#F59E0B",
+      purple: "#8B5CF6",
+      pink: "#EC4899",
+      orange: "#F97316",
+      brown: "#92400E",
+      beige: "#D4C5B9",
+      cream: "#FFFDD0",
+      olive: "#808000",
+      maroon: "#800000",
+      lavender: "#E6E6FA",
+      sage: "#9DC183",
+      sky: "#87CEEB",
+      coral: "#FF7F50",
+      charcoal: "#36454F",
+    };
+    return colorMap[colorName.toLowerCase()] || "#ccc";
   };
 
   return (
