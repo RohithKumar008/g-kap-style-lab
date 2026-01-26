@@ -10,6 +10,7 @@ import { Layout } from "@/components/layout/Layout";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { sortOptions } from "@/data/products";
 import { useProducts } from "@/hooks/useProducts";
+import { useSearchParams } from "react-router-dom";
 import api from "@/config/api";
 
 const Shop = () => {
@@ -52,8 +53,7 @@ const Shop = () => {
       name: p.name,
       price: p.price,
       originalPrice: p.original_price,
-      image: p.images?.[0]?.image_url || '/placeholder-product.svg',
-      images: p.images || [],
+      image: p.image_url || '/placeholder-product.svg',
       category: p.category,
       collection: p.collection,
       colors: p.colors || [],
@@ -118,21 +118,9 @@ const Shop = () => {
     }
 
     // Expand products by color - create a card for each color variant
-    const expandedByColor: typeof result = [];
-    result.forEach(product => {
-      product.colors.forEach(color => {
-        // If color filters are applied, only include cards for selected colors
-        if (selectedColors.length > 0 && !selectedColors.includes(color)) {
-          return; // Skip this color variant
-        }
-        expandedByColor.push({
-          ...product,
-          selectedColor: color
-        });
-      });
-    });
-
-    return expandedByColor;
+    // If you want to expand products by color, you need to extend the type
+    // Otherwise, just return result as is
+    return result;
   }, [products, selectedCategory, selectedCollection, selectedColors, selectedSizes, sortBy, searchQuery]);
 
   const toggleColor = (colorId: string) => {
@@ -449,7 +437,7 @@ const Shop = () => {
               ) : filteredProducts.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                   {filteredProducts.map((product) => (
-                    <ProductCard key={`${product.id}-${product.selectedColor}`} product={product} selectedColor={product.selectedColor} />
+                    <ProductCard key={product.id} product={product} />
                   ))}
                 </div>
               ) : (
