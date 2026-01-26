@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import api from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { Product } from './useProducts';
 
 export interface CartItem {
@@ -39,6 +41,9 @@ export const useCart = () => {
 // Add to cart
 export const useAddToCart = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
   return useMutation({
     mutationFn: async (item: {
@@ -48,6 +53,14 @@ export const useAddToCart = () => {
       selected_color: string;
     }) => {
       try {
+        if (!user) {
+          toast({
+            title: 'Sign in required',
+            description: 'Please sign in to add items to your cart.',
+          });
+          navigate('/login');
+          throw new Error('AUTH_REQUIRED');
+        }
         console.log('Adding to cart:', item);
         const { data } = await api.post<CartItem>('/cart', item);
         console.log('Add to cart success:', data);

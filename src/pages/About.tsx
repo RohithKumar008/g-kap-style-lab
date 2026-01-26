@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Sparkles, Heart, Leaf, Users } from "lucide-react";
+import { Sparkles, Heart, Leaf, Users, Instagram } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 
 const values = [
@@ -36,6 +36,70 @@ const About = () => (
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+
+    {/* Instagram Feed Section */}
+    <section className="py-20 bg-muted/30">
+      <div className="section-container">
+        <div className="text-center mb-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 text-sm font-medium mb-4"
+          >
+            <Instagram className="w-4 h-4" />
+            <span>Follow Us</span>
+          </motion.div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-3xl md:text-4xl font-display font-bold mb-4"
+          >
+            @gkap_branding
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className="text-muted-foreground max-w-xl mx-auto"
+          >
+            Stay updated with our latest designs, behind-the-scenes content, and community highlights.
+          </motion.p>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+          className="max-w-5xl mx-auto"
+        >
+          {/* Elfsight Instagram Feed Widget */}
+          <div className="elfsight-app-468baced-e730-4e59-9476-dd3a429d256f" data-elfsight-app-lazy></div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.4 }}
+          className="text-center mt-8"
+        >
+          <a
+            href="https://www.instagram.com/gkap_branding?igsh=MTM2ZGV2MDZ1aGxvZw%3D%3D&utm_source=qr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:shadow-lg transition-shadow"
+          >
+            <Instagram className="w-5 h-5" />
+            Follow us on Instagram
+          </a>
+        </motion.div>
       </div>
     </section>
   </Layout>

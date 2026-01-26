@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Zalando+Sans+Expanded:ital,wght@0,200..900;1,200..900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
@@ -13,6 +14,11 @@
 /* G-KAP Design System - Modern, Youth-Focused, Premium Yet Approachable
    Inspired by streetwear brands with soft neon accents and clean aesthetics
 */
+
+/* Smooth scrolling for the entire page */
+html {
+  scroll-behavior: smooth;
+}
 
 @layer base {
   :root {

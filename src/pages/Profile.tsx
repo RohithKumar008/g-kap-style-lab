@@ -80,7 +80,7 @@ const Profile = () => {
           className="mb-12"
         >
           <h1 className="text-4xl md:text-5xl font-display font-bold mb-2">My Account</h1>
-          <p className="text-muted-foreground">Welcome back, {user.email}</p>
+          <p className="text-muted-foreground">Welcome back, {user.user_metadata?.name || user.email}</p>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -148,12 +148,12 @@ const Profile = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="text-sm font-semibold text-muted-foreground">Email</label>
-                      <p className="text-lg font-medium mt-1">{user.email}</p>
+                      <label className="text-sm font-semibold text-muted-foreground">Full Name</label>
+                      <p className="text-lg font-medium mt-1">{user.user_metadata?.name || 'Not provided'}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-semibold text-muted-foreground">User ID</label>
-                      <p className="text-lg font-medium mt-1 font-mono text-sm">{user.id}</p>
+                      <label className="text-sm font-semibold text-muted-foreground">Email</label>
+                      <p className="text-lg font-medium mt-1">{user.email}</p>
                     </div>
                   </div>
                 </Card>
@@ -227,7 +227,7 @@ const Profile = () => {
                             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                           </Badge>
                           <Badge variant="outline" className="bg-primary/10">
-                            ${order.total.toFixed(2)}
+                            ₹{order.total.toFixed(2)}
                           </Badge>
                         </div>
                       </div>
@@ -245,7 +245,7 @@ const Profile = () => {
                                 {item.color} • Size {item.size} • Qty {item.quantity}
                               </p>
                             </div>
-                            <p className="font-semibold">${item.price.toFixed(2)}</p>
+                            <p className="font-semibold">₹{item.price.toFixed(2)}</p>
                           </div>
                         ))}
                       </div>
@@ -254,19 +254,19 @@ const Profile = () => {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <div>
                           <p className="text-xs text-muted-foreground font-semibold">Subtotal</p>
-                          <p className="font-bold mt-1">${order.subtotal.toFixed(2)}</p>
+                          <p className="font-bold mt-1">₹{order.subtotal.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground font-semibold">Shipping</p>
-                          <p className="font-bold mt-1">${order.shipping_cost.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">Shipping</p>
+                          <p className="font-bold mt-1">₹{order.shipping_cost.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground font-semibold">Tax</p>
-                          <p className="font-bold mt-1">${order.tax.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">Tax</p>
+                          <p className="font-bold mt-1">₹{order.tax.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground font-semibold">Total</p>
-                          <p className="font-bold text-lg text-primary mt-1">${order.total.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">Total</p>
+                          <p className="font-bold text-lg text-primary mt-1">₹{order.total.toFixed(2)}</p>
                         </div>
                       </div>
 
@@ -277,10 +277,20 @@ const Profile = () => {
                           <div>
                             <p className="font-semibold mb-1">Shipping Address</p>
                             <p className="text-muted-foreground">
-                              {order.shipping_address.street || "N/A"}
-                              {order.shipping_address.city && `, ${order.shipping_address.city}`}
+                              {order.shipping_address.firstName && order.shipping_address.lastName && (
+                                <>{order.shipping_address.firstName} {order.shipping_address.lastName}<br /></>
+                              )}
+                              {(order.shipping_address.address || order.shipping_address.street || "N/A")}
+                              {order.shipping_address.apartment && `, ${order.shipping_address.apartment}`}
+                              <br />
+                              {order.shipping_address.city && `${order.shipping_address.city}`}
                               {order.shipping_address.state && `, ${order.shipping_address.state}`}
                               {order.shipping_address.zip && ` ${order.shipping_address.zip}`}
+                              <br />
+                              {order.shipping_address.country}
+                              {order.shipping_address.phone && (
+                                <><br />Phone: {order.shipping_address.phone}</>
+                              )}
                             </p>
                           </div>
                         </div>

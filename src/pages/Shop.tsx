@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Filter, SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Layout } from "@/components/layout/Layout";
@@ -18,6 +19,7 @@ const Shop = () => {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("popular");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Dynamic filter options from backend
   const [categories, setCategories] = useState<string[]>([]);
@@ -64,6 +66,17 @@ const Shop = () => {
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((p) => 
+        p.name.toLowerCase().includes(query) ||
+        p.category.toLowerCase().includes(query) ||
+        p.collection.toLowerCase().includes(query) ||
+        p.colors.some(c => c.toLowerCase().includes(query))
+      );
+    }
 
     // Category filter
     if (selectedCategory !== "all") {
@@ -120,7 +133,7 @@ const Shop = () => {
     });
 
     return expandedByColor;
-  }, [products, selectedCategory, selectedCollection, selectedColors, selectedSizes, sortBy]);
+  }, [products, selectedCategory, selectedCollection, selectedColors, selectedSizes, sortBy, searchQuery]);
 
   const toggleColor = (colorId: string) => {
     setSelectedColors((prev) =>
@@ -304,6 +317,30 @@ const Shop = () => {
 
             {/* Main Content */}
             <div className="flex-1">
+              {/* Search Bar */}
+              <div className="mb-6">
+                <div className="relative">
+                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[20px]">
+                    search
+                  </span>
+                  <Input
+                    type="text"
+                    placeholder="Search products by name, category, collection, or color..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-10 h-12 text-base"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Toolbar */}
               <div className="flex items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-2">

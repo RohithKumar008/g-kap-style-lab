@@ -30,41 +30,15 @@ const footerLinks = {
 };
 
 const socialLinks = [
-  { icon: Instagram, href: "https://instagram.com/gkap", label: "Instagram" },
-  { icon: Twitter, href: "https://twitter.com/gkap", label: "Twitter" },
-  { icon: Facebook, href: "https://facebook.com/gkap", label: "Facebook" },
-  { icon: Youtube, href: "https://youtube.com/gkap", label: "YouTube" },
+  { icon: Instagram, label: "Instagram", url: "https://www.instagram.com/gkap_branding/" },
+  { icon: Twitter, label: "Twitter", url: "https://twitter.com/gkap_branding" },
+  { icon: Facebook, label: "Facebook", url: "https://facebook.com/gkap_branding" },
+  { icon: Youtube, label: "YouTube", url: "https://youtube.com/@gkap_branding" },
 ];
 
 export const Footer = () => {
   return (
     <footer className="bg-foreground text-background">
-      {/* Newsletter Section */}
-      <div className="border-b border-background/10">
-        <div className="section-container py-12 md:py-16">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="text-center md:text-left">
-              <h3 className="text-2xl md:text-3xl font-display font-bold mb-2">
-                Join the G-KAP Crew
-              </h3>
-              <p className="text-background/70">
-                Get 15% off your first order + exclusive drops & updates
-              </p>
-            </div>
-            <div className="flex w-full max-w-md gap-2">
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                className="bg-background/10 border-background/20 text-background placeholder:text-background/50 focus:border-primary"
-              />
-              <Button variant="hero" className="shrink-0">
-                Subscribe
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Footer Content */}
       <div className="section-container py-12 md:py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12">
@@ -82,7 +56,7 @@ export const Footer = () => {
               {socialLinks.map((social) => (
                 <a
                   key={social.label}
-                  href={social.href}
+                  href={social.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-10 h-10 rounded-full bg-background/10 flex items-center justify-center hover:bg-primary hover:text-foreground transition-colors"
@@ -151,15 +125,15 @@ export const Footer = () => {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm text-background/70">
                 <Mail className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>hello@gkap.com</span>
+                <span>gkapprints@gmail.com</span>
               </li>
               <li className="flex items-start gap-2 text-sm text-background/70">
                 <Phone className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>+1 (555) 123-4567</span>
+                <span>7287980727</span>
               </li>
               <li className="flex items-start gap-2 text-sm text-background/70">
                 <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>123 Creative Street, Design District</span>
+                <span>H.NO : 4-7-285/11 & 12 PLOT NO : 11 & 12 EP Padmavathi colony hayathnagar hyderabad 501505</span>
               </li>
             </ul>
           </div>

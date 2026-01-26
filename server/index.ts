@@ -7,6 +7,7 @@ import cartRoutes from './routes/cart';
 import ordersRoutes from './routes/orders';
 import customizeRoutes from './routes/customize';
 import tshirtOptionsRoutes from './routes/tshirt-options';
+import addressesRoutes from './routes/addresses';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/customize', customizeRoutes);
 app.use('/api/tshirt-options', tshirtOptionsRoutes);
+app.use('/api/addresses', addressesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

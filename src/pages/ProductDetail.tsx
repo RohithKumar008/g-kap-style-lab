@@ -231,15 +231,15 @@ const ProductDetail = () => {
 
             <div className="flex items-center gap-3">
               <span className="text-3xl font-display font-bold">
-                ${productData.price.toFixed(2)}
+                ₹{productData.price.toFixed(2)}
               </span>
               {productData.originalPrice && (
                 <>
                   <span className="text-xl text-muted-foreground line-through">
-                    ${productData.originalPrice.toFixed(2)}
+                    ₹{productData.originalPrice.toFixed(2)}
                   </span>
                   <Badge className="bg-destructive text-destructive-foreground">
-                    Save ${(productData.originalPrice - productData.price).toFixed(2)}
+                    Save ₹{(productData.originalPrice - productData.price).toFixed(2)}
                   </Badge>
                 </>
               )}
@@ -336,6 +336,7 @@ const ProductDetail = () => {
                       description: `${productData.name} x${quantity} has been added to your cart.`,
                     });
                   } catch (error: any) {
+                    if (error?.message === "AUTH_REQUIRED") return;
                     toast({
                       title: "Error",
                       description: error.response?.data?.error || "Failed to add to cart",
@@ -361,7 +362,7 @@ const ProductDetail = () => {
               <div className="text-center">
                 <Truck className="w-6 h-6 mx-auto mb-1 text-mint" />
                 <p className="text-xs text-muted-foreground">
-                  Free Shipping ${productData.freeShippingThreshold}+
+                  Free Shipping ₹{productData.freeShippingThreshold}+
                 </p>
               </div>
               <div className="text-center">
@@ -438,7 +439,7 @@ const ProductDetail = () => {
                     <p>Express shipping: 2-3 business days</p>
                     
                     <h4 className="text-foreground font-semibold mt-4">Free Shipping</h4>
-                    <p>Orders over ${productData.freeShippingThreshold} qualify for free standard shipping.</p>
+                    <p>Orders over ₹{productData.freeShippingThreshold} qualify for free standard shipping.</p>
                     
                     <h4 className="text-foreground font-semibold mt-4">Returns</h4>
                     <p>{productData.returnDays}-day hassle-free returns. See our return policy for details.</p>

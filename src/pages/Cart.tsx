@@ -61,7 +61,7 @@ const Cart = () => {
   });
 
   const subtotal = normalized.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shipping = subtotal > 50 ? 0 : 9.99;
+  const shipping = subtotal > 1000 ? 0 : 9.99;
   const total = subtotal + shipping;
 
   if (isLoading) {
@@ -147,31 +147,18 @@ const Cart = () => {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-card rounded-2xl p-6 shadow-soft sticky top-24">
-              <h2 className="font-display font-bold text-xl mb-6">Order Summary</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Subtotal ({normalized.length} {normalized.length === 1 ? 'item' : 'items'})</span>
+                  <span className="font-display font-bold text-xl">₹{subtotal.toFixed(2)}</span>
+                </div>
 
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-semibold">${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-muted-foreground">Shipping</span>
-                <span className="font-semibold">{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
-              </div>
-              <div className="flex items-center justify-between text-lg font-display font-bold border-t pt-3 mt-3">
-                <span>Total</span>
-                <span>${total.toFixed(2)}</span>
-              </div>
-
-              <Link to="/checkout">
-                <Button className="w-full mt-6" size="lg">
-                  Checkout
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-
-              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-4">
-                <Truck className="w-4 h-4" />
-                <span>Free shipping on orders over $50</span>
+                <Link to="/checkout">
+                  <Button className="w-full" size="lg">
+                    Proceed to Buy
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -308,9 +295,9 @@ const CartItemCard = ({ item, index, onUpdateQty, onRemove }: CartItemCardProps)
             </button>
           </div>
           <div className="text-right">
-            <p className="font-display font-bold text-lg">${(item.price * item.quantity).toFixed(2)}</p>
+            <p className="font-display font-bold text-lg">₹{(item.price * item.quantity).toFixed(2)}</p>
             {item.quantity > 1 && (
-              <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
+              <p className="text-xs text-muted-foreground">₹{item.price.toFixed(2)} each</p>
             )}
           </div>
         </div>

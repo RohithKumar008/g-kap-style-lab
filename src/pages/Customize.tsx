@@ -410,7 +410,7 @@ const Customize = () => {
                           <Check className="w-5 h-5 text-primary" />
                         )}
                       </div>
-                      <span className="text-sm text-muted-foreground">${type.price.toFixed(2)}</span>
+                      <span className="text-sm text-muted-foreground">₹{type.price.toFixed(2)}</span>
                     </button>
                   ))}
                 </div>
@@ -491,12 +491,12 @@ const Customize = () => {
                 <div className="space-y-2 mb-6 pb-6 border-b">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{selectedType?.name || "Select a type"}</span>
-                    <span>{selectedType ? `$${selectedType.price.toFixed(2)}` : "--"}</span>
+                    <span>{selectedType ? `₹${selectedType.price.toFixed(2)}` : "--"}</span>
                   </div>
                   {hasAnySideImage && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Custom Print</span>
-                      <span>+$10.00</span>
+                      <span>+₹10.00</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm">

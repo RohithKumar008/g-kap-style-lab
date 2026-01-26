@@ -9,6 +9,9 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<any>;
   signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<any>;
+  signInWithFacebook: () => Promise<any>;
+  signInWithX: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +21,9 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => {},
   signIn: async () => {},
   signOut: async () => {},
+  signInWithGoogle: async () => {},
+  signInWithFacebook: async () => {},
+  signInWithX: async () => {},
 });
 
 export const useAuth = () => {
@@ -95,6 +101,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     localStorage.removeItem('access_token');
+    
+    // Clear React Query cache to reset cart and other user data
+    window.location.reload();
+  };
+
+  const signInWithGoogle = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/shop`,
+      },
+    });
+
+    if (error) throw error;
+    return data;
+  };
+
+  const signInWithFacebook = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        redirectTo: `${window.location.origin}/shop`,
+      },
+    });
+
+    if (error) throw error;
+    return data;
+  };
+
+  const signInWithX = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'twitter',
+      options: {
+        redirectTo: `${window.location.origin}/shop`,
+      },
+    });
+
+    if (error) throw error;
+    return data;
   };
 
   const value = {
@@ -104,6 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signOut,
+    signInWithGoogle,
+    signInWithFacebook,
+    signInWithX,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

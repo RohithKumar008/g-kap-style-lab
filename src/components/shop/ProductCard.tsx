@@ -60,6 +60,7 @@ export const ProductCard = ({ product, selectedColor }: ProductCardProps) => {
         description: `${product.name} has been added to your cart.`,
       });
     } catch (error: any) {
+      if (error?.message === "AUTH_REQUIRED") return;
       toast({
         title: "Error",
         description: error.response?.data?.error || "Failed to add to cart",
@@ -144,15 +145,21 @@ export const ProductCard = ({ product, selectedColor }: ProductCardProps) => {
           )}
           
           {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
             {product.isNew && (
-              <Badge className="bg-coral text-primary-foreground border-0">New</Badge>
+              <Badge className="bg-blue-50 text-blue-700 border border-blue-200 shadow-sm font-medium text-xs px-3 py-0.5 uppercase tracking-wide rounded-sm">
+                New
+              </Badge>
             )}
             {product.isBestseller && (
-              <Badge className="bg-mint text-foreground border-0">Bestseller</Badge>
+              <Badge className="bg-amber-50 text-amber-700 border border-amber-200 shadow-sm font-medium text-xs px-3 py-0.5 uppercase tracking-wide rounded-sm">
+                Bestseller
+              </Badge>
             )}
             {product.originalPrice && (
-              <Badge className="bg-destructive text-destructive-foreground border-0">Sale</Badge>
+              <Badge className="bg-red-50 text-red-700 border border-red-200 shadow-sm font-medium text-xs px-3 py-0.5 uppercase tracking-wide rounded-sm">
+                Sale
+              </Badge>
             )}
           </div>
           
@@ -196,11 +203,11 @@ export const ProductCard = ({ product, selectedColor }: ProductCardProps) => {
         <p className="text-sm text-muted-foreground">{product.fit}</p>
         <div className="flex items-center gap-2">
           <span className="font-display font-bold text-lg">
-            ${product.price.toFixed(2)}
+            ₹{product.price.toFixed(2)}
           </span>
           {product.originalPrice && (
             <span className="text-sm text-muted-foreground line-through">
-              ${product.originalPrice.toFixed(2)}
+              ₹{product.originalPrice.toFixed(2)}
             </span>
           )}
         </div>

@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, CreditCard, Truck, ChevronRight, Check } from "lucide-react";
+import { ArrowLeft, CreditCard, Truck, ChevronRight, Check, MapPin, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,8 @@ import { Layout } from "@/components/layout/Layout";
 import { useDeleteDesign } from "@/hooks/useCustomize";
 import { useCreateOrder } from "@/hooks/useOrders";
 import { useCart } from "@/hooks/useCart";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAddresses } from "@/hooks/useAddresses";
 import { useToast } from "@/hooks/use-toast";
 
 interface CustomDesign {
@@ -30,8 +33,14 @@ interface CustomDesign {
 const Checkout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: savedAddresses = [] } = useAddresses();
   const [step, setStep] = useState<"shipping" | "payment" | "confirmation">("shipping");
   const [shippingMethod, setShippingMethod] = useState("standard");
+  const [buyingFor, setBuyingFor] = useState<"me" | "someone">("me");
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("new");
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [designToBuy, setDesignToBuy] = useState<CustomDesign | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { mutateAsync: deleteDesign } = useDeleteDesign();
@@ -44,11 +53,13 @@ const Checkout = () => {
     lastName: "",
     email: "",
     phone: "",
-    address: "",
+    streetAddress: "",
+    apartment: "",
     city: "",
     state: "",
     zip: "",
-    country: "",
+    country: "India",
+    tag: "home" as "home" | "office" | "other",
     cardName: "",
     cardNumber: "",
     expiry: "",
@@ -60,11 +71,131 @@ const Checkout = () => {
     if (stored) {
       setDesignToBuy(JSON.parse(stored));
     }
+    
+    // Auto-fill user details if buying for me
+    if (buyingFor === "me" && user) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: user.user_metadata?.name?.split(' ')[0] || '',
+        lastName: user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
+        email: user.email || '',
+      }));
+    } else if (buyingFor === "someone") {
+      // Clear all fields when switching to someone else
+      setFormData(prev => ({
+        ...prev,
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        streetAddress: '',
+        apartment: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: '',
+      }));
+    }
+  }, [buyingFor, user]);
+
+  // Update address when selection changes
+  useEffect(() => {
+    if (selectedAddressId !== "new" && savedAddresses.length > 0) {
+      const selectedAddr = savedAddresses.find(a => a.id === selectedAddressId);
+      if (selectedAddr) {
+        setFormData(prev => ({
+          ...prev,
+          streetAddress: selectedAddr.street_address,
+          apartment: selectedAddr.home_address,
+          city: selectedAddr.city,
+          state: selectedAddr.state,
+          zip: selectedAddr.pincode,
+          country: selectedAddr.country,
+          phone: selectedAddr.phone,
+        }));
+        setShowNewAddressForm(false);
+      }
+    } else if (selectedAddressId === "new") {
+      setShowNewAddressForm(true);
+    }
+  }, [selectedAddressId, savedAddresses]);
+
+  const handleLocateMe = async () => {
+    setIsLocating(true);
+    try {
+      const position = await new Promise<GeolocationCoordinates>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          success => resolve(success.coords),
+          error => reject(error),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      });
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&addressdetails=1`,
+        { headers: { 'User-Agent': 'G-KAP-Store' } }
+      );
+      const data = await response.json();
+
+      if (data && data.address) {
+        const addr = data.address;
+        setFormData(prev => ({
+          ...prev,
+          city: addr.city || addr.town || addr.village || prev.city,
+          state: addr.state || prev.state,
+          country: addr.country || prev.country,
+          zip: addr.postcode || prev.zip,
+        }));
+        toast({
+          title: 'Location detected!',
+          description: `${addr.city || addr.town}, ${addr.state}`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Could not detect location. Please enter manually.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLocating(false);
+    }
+  }
+  useEffect(() => {
+    const stored = localStorage.getItem('designToBuy');
+    if (stored) {
+      setDesignToBuy(JSON.parse(stored));
+    }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  // Validation function
+  const validateShippingForm = () => {
+    const required = ['firstName', 'lastName', 'email', 'phone', 'streetAddress', 'apartment', 'city', 'state', 'zip', 'country'];
+    
+    for (const field of required) {
+      if (!formData[field as keyof typeof formData] || formData[field as keyof typeof formData].toString().trim() === '') {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const handleContinueToPayment = () => {
+    if (!validateShippingForm()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setStep("payment");
   };
 
   // Normalize cart items to get price from products relationship
@@ -87,9 +218,9 @@ const Checkout = () => {
   const subtotal = designToBuy 
     ? designPrice * (designToBuy.quantity || 1) 
     : normalizedCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const shipping = shippingMethod === "express" ? 14.99 : 0;
-  const tax = (subtotal + shipping) * 0.08;
-  const total = subtotal + shipping + tax;
+  
+  const shippingCost = shippingMethod === "express" ? 200 : (subtotal > 1000 ? 0 : 100);
+  const total = subtotal + shippingCost;
 
   const handleConfirmation = async () => {
     setIsProcessing(true);
@@ -117,7 +248,8 @@ const Checkout = () => {
           lastName: formData.lastName,
           email: formData.email,
           phone: formData.phone,
-          address: formData.address,
+          address: formData.streetAddress,
+          apartment: formData.apartment,
           city: formData.city,
           state: formData.state,
           zip: formData.zip,
@@ -126,8 +258,8 @@ const Checkout = () => {
         shipping_method: shippingMethod,
         payment_method: "credit_card",
         subtotal,
-        shipping_cost: shipping,
-        tax,
+        shipping_cost: shippingCost,
+        tax: 0,
         total,
       };
 
@@ -250,44 +382,180 @@ const Checkout = () => {
                     Shipping Information
                   </h2>
 
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" placeholder="John" value={formData.firstName} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="john@example.com" value={formData.email} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input id="phone" type="tel" placeholder="+1 (555) 123-4567" value={formData.phone} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="address">Street Address</Label>
-                      <Input id="address" placeholder="123 Main Street" value={formData.address} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input id="city" placeholder="New York" value={formData.city} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
-                      <Input id="state" placeholder="NY" value={formData.state} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="zip">ZIP Code</Label>
-                      <Input id="zip" placeholder="10001" value={formData.zip} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="country">Country</Label>
-                      <Input id="country" placeholder="United States" value={formData.country} onChange={handleInputChange} />
-                    </div>
+                  {/* Buying For Choice */}
+                  <div className="mb-6">
+                    <Label className="mb-3 block">Who are you buying for?</Label>
+                    <RadioGroup value={buyingFor} onValueChange={(value: "me" | "someone") => setBuyingFor(value)} className="grid grid-cols-2 gap-3">
+                      <label className={`flex items-center justify-center p-4 rounded-xl border cursor-pointer transition-colors ${
+                        buyingFor === "me" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                      }`}>
+                        <RadioGroupItem value="me" id="for-me" className="mr-2" />
+                        <span className="font-medium">For Me</span>
+                      </label>
+                      <label className={`flex items-center justify-center p-4 rounded-xl border cursor-pointer transition-colors ${
+                        buyingFor === "someone" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                      }`}>
+                        <RadioGroupItem value="someone" id="for-someone" className="mr-2" />
+                        <span className="font-medium">For Someone Else</span>
+                      </label>
+                    </RadioGroup>
                   </div>
+
+                  {buyingFor === "me" ? (
+                    /* Buying for Me */
+                    <>
+                      <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName-me">First Name</Label>
+                          <Input id="firstName-me" value={formData.firstName} onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lastName-me">Last Name</Label>
+                          <Input id="lastName-me" value={formData.lastName} onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="email-me">Email</Label>
+                          <Input id="email-me" type="email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="phone-me">Phone</Label>
+                          <Input id="phone-me" type="tel" placeholder="+91 9876543210" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} />
+                        </div>
+                      </div>
+
+                      {/* Address Selection */}
+                      <div className="space-y-2 mb-4">
+                        <Label htmlFor="address-select">Select Address</Label>
+                        <Select value={selectedAddressId} onValueChange={setSelectedAddressId}>
+                          <SelectTrigger id="address-select">
+                            <SelectValue placeholder="Choose an address" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {savedAddresses.length === 0 ? (
+                              <SelectItem value="new">No saved addresses - Add new</SelectItem>
+                            ) : (
+                              <>
+                                {savedAddresses.map((addr) => (
+                                  <SelectItem key={addr.id} value={addr.id}>
+                                    {addr.tag === 'other' ? addr.custom_tag : addr.tag.charAt(0).toUpperCase() + addr.tag.slice(1)} - {addr.street_address}, {addr.city}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value="new">+ Add New Address</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* New Address Form (inline) */}
+                      {showNewAddressForm && (
+                        <div className="grid sm:grid-cols-2 gap-4 p-4 border rounded-xl bg-muted/30">
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="street">Street Address</Label>
+                            <Input id="street" placeholder="123 Main Street" value={formData.streetAddress} onChange={(e) => setFormData(prev => ({ ...prev, streetAddress: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="apartment">Apartment/House Number</Label>
+                            <Input id="apartment" placeholder="Apt 4B" value={formData.apartment} onChange={(e) => setFormData(prev => ({ ...prev, apartment: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="city-new">City</Label>
+                            <Input id="city-new" placeholder="Mumbai" value={formData.city} onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="state-new">State</Label>
+                            <Input id="state-new" placeholder="Maharashtra" value={formData.state} onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="country-new">Country</Label>
+                            <Input id="country-new" placeholder="India" value={formData.country} onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="zip-new">Pincode</Label>
+                            <Input id="zip-new" placeholder="400001" value={formData.zip} onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="tag">Address Tag</Label>
+                            <Select value={formData.tag} onValueChange={(value: "home" | "office" | "other") => setFormData(prev => ({ ...prev, tag: value }))}>
+                              <SelectTrigger id="tag">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="home">Home</SelectItem>
+                                <SelectItem value="office">Office</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleLocateMe}
+                              disabled={isLocating}
+                              className="w-full"
+                            >
+                              {isLocating ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Locating...
+                                </>
+                              ) : (
+                                <>
+                                  <MapPin className="w-4 h-4 mr-2" />
+                                  Locate Me
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Buying for Someone Else */
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input id="firstName" placeholder="John" value={formData.firstName} onChange={handleInputChange} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={handleInputChange} />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" type="email" placeholder="john@example.com" value={formData.email} onChange={handleInputChange} />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input id="phone" type="tel" placeholder="+91 9876543210" value={formData.phone} onChange={handleInputChange} />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="streetAddress">Street Address</Label>
+                        <Input id="streetAddress" placeholder="123 Main Street" value={formData.streetAddress} onChange={(e) => setFormData(prev => ({ ...prev, streetAddress: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="apartment">Apartment/House Number</Label>
+                        <Input id="apartment" placeholder="Apt 4B" value={formData.apartment} onChange={(e) => setFormData(prev => ({ ...prev, apartment: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="city">City</Label>
+                        <Input id="city" placeholder="Mumbai" value={formData.city} onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="state">State</Label>
+                        <Input id="state" placeholder="Maharashtra" value={formData.state} onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="zip">Pincode</Label>
+                        <Input id="zip" placeholder="400001" value={formData.zip} onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="country">Country</Label>
+                        <Input id="country" placeholder="India" value={formData.country} onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))} />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-card rounded-2xl p-6 shadow-soft">
@@ -304,7 +572,14 @@ const Checkout = () => {
                           <p className="text-sm text-muted-foreground">5-7 business days</p>
                         </div>
                       </div>
-                      <span className="font-semibold text-mint">FREE</span>
+                      {subtotal > 1000 ? (
+                        <div className="text-right">
+                          <span className="font-semibold text-muted-foreground line-through text-sm mr-2">₹100</span>
+                          <span className="font-semibold text-green-600">FREE</span>
+                        </div>
+                      ) : (
+                        <span className="font-semibold">₹100</span>
+                      )}
                     </label>
                     
                     <label className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors ${
@@ -317,7 +592,7 @@ const Checkout = () => {
                           <p className="text-sm text-muted-foreground">2-3 business days</p>
                         </div>
                       </div>
-                      <span className="font-semibold">$14.99</span>
+                      <span className="font-semibold">₹200</span>
                     </label>
                   </RadioGroup>
                 </div>
@@ -326,7 +601,7 @@ const Checkout = () => {
                   variant="hero"
                   size="xl"
                   className="w-full"
-                  onClick={() => setStep("payment")}
+                  onClick={handleContinueToPayment}
                 >
                   Continue to Payment
                   <ChevronRight className="w-5 h-5 ml-2" />
@@ -392,7 +667,7 @@ const Checkout = () => {
                     onClick={handleConfirmation}
                     disabled={isProcessing}
                   >
-                    {isProcessing ? "Processing..." : `Place Order - $${total.toFixed(2)}`}
+                    {isProcessing ? "Processing..." : `Place Order - ₹${total.toFixed(2)}`}
                   </Button>
                 </div>
               </motion.div>
@@ -446,7 +721,7 @@ const Checkout = () => {
                           Size: {item.selected_size} • Color: {item.selected_color}
                         </p>
                         <p className="text-sm font-semibold">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ₹{(item.price * item.quantity).toFixed(2)}
                           {item.quantity > 1 && ` (${item.quantity}x)`}
                         </p>
                       </div>
@@ -460,15 +735,18 @@ const Checkout = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>{shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax</span>
-                  <span>${tax.toFixed(2)}</span>
+                  {shippingCost === 0 ? (
+                    <div className="text-right">
+                      <span className="text-muted-foreground line-through text-xs mr-2">₹100</span>
+                      <span className="font-semibold text-green-600">FREE</span>
+                    </div>
+                  ) : (
+                    <span>₹{shippingCost.toFixed(2)}</span>
+                  )}
                 </div>
               </div>
 
@@ -477,7 +755,7 @@ const Checkout = () => {
               <div className="flex justify-between items-center">
                 <span className="font-display font-bold text-lg">Total</span>
                 <span className="font-display font-bold text-xl">
-                  ${total.toFixed(2)}
+                  ₹{total.toFixed(2)}
                 </span>
               </div>
             </div>
