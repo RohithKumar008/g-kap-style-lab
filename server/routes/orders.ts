@@ -116,9 +116,10 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: itemsError.message });
     }
 
-    // Fetch custom design info if present
+    // Fetch custom design info and attachments if present
     let customDesignInfo = '';
     let customDesignImage = '';
+    let attachments: any[] = [];
     const customItem = items.find((item: any) => item.design_id);
     if (customItem && customItem.design_id) {
       const { data: design } = await supabase
@@ -127,10 +128,31 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         .eq('id', customItem.design_id)
         .single();
       if (design) {
-        customDesignInfo = `\nCustom Design: ${design.tshirt_type} - ${design.tshirt_color}, Size: ${design.size}, Qty: ${design.quantity}`;
+        customDesignInfo = `<br><b>Custom Design:</b> ${design.tshirt_type} - ${design.tshirt_color}, Size: ${design.size}, Qty: ${design.quantity}, Print Location: ${design.print_location}`;
         if (design.image_url) {
           customDesignImage = `<br><b>Uploaded Logo:</b><br><img src="${design.image_url}" alt="Custom Logo" style="max-width:200px;">`;
+          // Attach original logo
+          attachments.push({ filename: 'uploaded-logo.png', path: design.image_url });
         }
+        // Attach template image
+        const templatePath = require('path').join(__dirname, '../../public/models/Template.png');
+        attachments.push({ filename: 'template.png', path: templatePath });
+      }
+    }
+
+    // Attach product image if shop order
+    const productItem = items.find((item: any) => item.product_id);
+    let productImageHtml = '';
+    if (productItem && productItem.product_id) {
+      // Try to fetch product image
+      const { data: product } = await supabase
+        .from('products')
+        .select('image_url')
+        .eq('id', productItem.product_id)
+        .single();
+      if (product && product.image_url) {
+        productImageHtml = `<br><b>Product Image:</b><br><img src="${product.image_url}" alt="Product Image" style="max-width:200px;">`;
+        attachments.push({ filename: 'product-image.png', path: product.image_url });
       }
     }
 
@@ -143,10 +165,14 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           <h2>New Order Placed</h2>
           <b>Order ID:</b> ${order.id}<br>
           <b>Location:</b> ${shipping_address?.city || ''}, ${shipping_address?.state || ''}, ${shipping_address?.country || ''}<br>
-          <b>Order Details:</b> ${items.map((item: any) => `${item.product_id ? 'Product' : 'Custom'} - Size: ${item.size}, Color: ${item.color}, Qty: ${item.quantity}`).join(', ')}
-          ${customDesignInfo}
+          <b>Order Details:</b> ${items.map((item: any) => item.product_id
+            ? `Product - Product ID: ${item.product_id}, Size: ${item.size}, Color: ${item.color}, Qty: ${item.quantity}`
+            : `Custom - T-shirt Type: ${customDesignInfo}, Print Location: ${design?.print_location}`
+          ).join('<br>')}
           ${customDesignImage}
+          ${productImageHtml}
         `,
+        attachments,
       });
     } catch (e) {
       // Log but don't block order creation

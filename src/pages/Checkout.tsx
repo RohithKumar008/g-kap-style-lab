@@ -165,6 +165,12 @@ const Checkout = () => {
     if (stored) {
       setDesignToBuy(JSON.parse(stored));
     }
+
+    // Cleanup: clear designToBuy when leaving the page
+    return () => {
+      localStorage.removeItem('designToBuy');
+      setDesignToBuy(null);
+    };
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
