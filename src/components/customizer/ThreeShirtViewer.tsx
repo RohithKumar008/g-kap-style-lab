@@ -156,7 +156,82 @@ export const ThreeShirtViewer = ({
         dpr={[1, 2]}
         camera={{ position: [0, 0.8, 3.5], fov: 45 }}
       >
-        <color attach="background" args={["#0f172a"]} />
+        {/* Set background color based on shirt color */}
+{(() => {
+  if (!colorHex) {
+    return <color attach="background" args={["#0f172a"]} />;
+  }
+
+  const c = colorHex.trim().toLowerCase();
+
+  // Convert hex to rgb
+  const hexToRgb = (hex: string) => {
+    let h = hex.replace("#", "");
+
+    // Handle shorthand #fff
+    if (h.length === 3) {
+      h = h
+        .split("")
+        .map((x) => x + x)
+        .join("");
+    }
+
+    const num = parseInt(h, 16);
+
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+    };
+  };
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  // HEX value
+  if (c.startsWith("#") || /^[0-9a-f]{6}$/.test(c)) {
+    const hex = c.startsWith("#") ? c : `#${c}`;
+    ({ r, g, b } = hexToRgb(hex));
+  }
+
+  // RGB() string
+  if (c.startsWith("rgb")) {
+    const nums = c.match(/\d+/g);
+    if (nums?.length >= 3) {
+      [r, g, b] = nums.map(Number);
+    }
+  }
+
+  // Named colors fallback
+  if (c === "black") {
+    r = 0;
+    g = 0;
+    b = 0;
+  }
+
+  if (c === "white") {
+    r = 255;
+    g = 255;
+    b = 255;
+  }
+
+  // Luminance formula
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+  // Very dark shirt → white background
+  if (brightness < 60) {
+    return <color attach="background" args={["#dcd0d0"]} />;
+  }
+
+  // Very light shirt → black background
+  if (brightness > 200) {
+    return <color attach="background" args={["#000000"]} />;
+  }
+
+  // Neutral fallback
+  return <color attach="background" args={["#0f172a"]} />;
+})()}
         <ambientLight intensity={0.5} />
         <directionalLight
           castShadow

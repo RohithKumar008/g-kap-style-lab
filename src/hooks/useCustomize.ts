@@ -14,6 +14,7 @@ export interface CustomDesign {
   image_rotation: number;
   status: string;
   created_at: string;
+  price?: number;
 }
 
 // Fetch all custom designs

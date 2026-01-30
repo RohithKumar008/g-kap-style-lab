@@ -399,6 +399,10 @@ const Profile = () => {
                               <p className="text-xs text-muted-foreground font-semibold">Scale</p>
                               <p className="font-bold mt-1">{(design.image_scale * 100).toFixed(0)}%</p>
                             </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-semibold">Price</p>
+                              <p className="font-bold mt-1">₹{design.price ? design.price.toFixed(2) : '--'}</p>
+                            </div>
                           </div>
 
                           {/* Actions */}

@@ -1,13 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/config/api';
 
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  display_order: number;
+  color?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
   description?: string;
   price: number;
   original_price?: number;
-  image_url: string;
   category: string;
   collection: string;
   colors: string[];
@@ -17,6 +24,7 @@ export interface Product {
   is_new?: boolean;
   is_bestseller?: boolean;
   created_at?: string;
+  product_images?: ProductImage[];
 }
 
 // Fetch all products
@@ -32,9 +40,16 @@ export const useProducts = (filters?: {
       if (filters?.category) params.append('category', filters.category);
       if (filters?.collection) params.append('collection', filters.collection);
       if (filters?.sortBy) params.append('sortBy', filters.sortBy);
-      
-      const { data } = await api.get<Product[]>(`/products?${params.toString()}`);
-      return data;
+
+      // Fetch products with nested product_images (ordered)
+      const { data } = await api.get<Product[]>(
+        `/products?${params.toString()}`
+      );
+      // If backend returns 'images', map to 'product_images' for compatibility
+      return data?.map((p: any) => ({
+        ...p,
+        product_images: p.product_images || p.images || [],
+      })) || [];
     },
   });
 };

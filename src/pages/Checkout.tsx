@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+// @ts-ignore
+import Razorpay from "razorpay";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -60,10 +62,7 @@ const Checkout = () => {
     zip: "",
     country: "India",
     tag: "home" as "home" | "office" | "other",
-    cardName: "",
-    cardNumber: "",
-    expiry: "",
-    cvv: "",
+    // Card fields removed; handled by Razorpay
   });
 
   useEffect(() => {
@@ -214,7 +213,7 @@ const Checkout = () => {
   });
 
   // Price for custom design
-  const designPrice = 49.99;
+  const designPrice = designToBuy?.price ?? 49.99;
   const subtotal = designToBuy 
     ? designPrice * (designToBuy.quantity || 1) 
     : normalizedCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -222,81 +221,95 @@ const Checkout = () => {
   const shippingCost = shippingMethod === "express" ? 200 : (subtotal > 1000 ? 0 : 100);
   const total = subtotal + shippingCost;
 
+  // Razorpay payment integration
   const handleConfirmation = async () => {
     setIsProcessing(true);
     try {
-      // Prepare order data
-      const orderData = {
-        items: designToBuy 
-          ? [{
-              product_id: null, // No product_id for custom designs
-              quantity: designToBuy.quantity,
-              size: designToBuy.size,
-              color: designToBuy.tshirt_color,
-              price: designPrice,
-              design_id: designToBuy.id // Include design_id for tracking
-            }]
-          : normalizedCartItems.map(item => ({ 
-              product_id: item.product_id, 
-              quantity: item.quantity,
-              size: item.selected_size,
-              color: item.selected_color,
-              price: item.price
-            })),
-        shipping_address: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.streetAddress,
-          apartment: formData.apartment,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zip,
-          country: formData.country,
-        },
-        shipping_method: shippingMethod,
-        payment_method: "credit_card",
-        subtotal,
-        shipping_cost: shippingCost,
-        tax: 0,
-        total,
+      // Dynamically load Razorpay script
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+
+      script.onload = async () => {
+        const options = {
+          key: 'rzp_test_1DP5mmOlF5G5ag', // Demo key, replace with your own for production
+          amount: Math.round(total * 100), // in paise
+          currency: 'INR',
+          name: 'G-KAP Store',
+          description: 'T-shirt Order',
+          image: 'src/assets/logo.jpg',
+          handler: async function (response: any) {
+            // Payment success, now create order
+            try {
+              const orderData = {
+                items: designToBuy 
+                  ? [{
+                      product_id: null,
+                      quantity: designToBuy.quantity,
+                      size: designToBuy.size,
+                      color: designToBuy.tshirt_color,
+                      price: designPrice,
+                      design_id: designToBuy.id
+                    }]
+                  : normalizedCartItems.map(item => ({ 
+                      product_id: item.product_id, 
+                      quantity: item.quantity,
+                      size: item.selected_size,
+                      color: item.selected_color,
+                      price: item.price
+                    })),
+                shipping_address: {
+                  firstName: formData.firstName,
+                  lastName: formData.lastName,
+                  email: formData.email,
+                  phone: formData.phone,
+                  address: formData.streetAddress,
+                  apartment: formData.apartment,
+                  city: formData.city,
+                  state: formData.state,
+                  zip: formData.zip,
+                  country: formData.country,
+                },
+                shipping_method: shippingMethod,
+                payment_method: response.method || 'razorpay',
+                subtotal,
+                shipping_cost: shippingCost,
+                tax: 0,
+                total,
+                payment_id: response.razorpay_payment_id,
+              };
+              await createOrder(orderData);
+              if (designToBuy?.id) {
+                try { await deleteDesign(designToBuy.id); } catch {}
+              }
+              localStorage.removeItem('designToBuy');
+              toast({ title: 'Order Placed!', description: 'Your order has been successfully created and saved.' });
+              setStep('confirmation');
+            } catch (error: any) {
+              toast({ title: 'Error', description: error?.message || 'Failed to place order.', variant: 'destructive' });
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+          prefill: {
+            name: formData.firstName + ' ' + formData.lastName,
+            email: formData.email,
+            contact: formData.phone,
+          },
+          theme: { color: '#00b894' },
+          method: { netbanking: true, card: true, upi: true, wallet: false },
+          modal: {
+            ondismiss: () => setIsProcessing(false),
+          },
+        };
+        // @ts-ignore
+        const rzp = new window.Razorpay(options);
+        rzp.open();
       };
-
-      console.log("Creating order with data:", orderData);
-
-      // Create order in database
-      await createOrder(orderData);
-
-      // Delete the design if it was a custom design purchase
-      if (designToBuy?.id) {
-        try {
-          await deleteDesign(designToBuy.id);
-        } catch (error) {
-          console.error("Error deleting design:", error);
-        }
-      }
-
-      // Clear the localStorage
-      localStorage.removeItem('designToBuy');
-
-      toast({
-        title: "Order Placed!",
-        description: "Your order has been successfully created and saved.",
-      });
-
-      // Navigate to confirmation
-      setStep("confirmation");
     } catch (error: any) {
-      console.error("Error placing order:", error);
-      const errorMessage = error?.response?.data?.error || error?.message || "Failed to place order. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
       setIsProcessing(false);
+      toast({ title: 'Error', description: error?.message || 'Payment failed.', variant: 'destructive' });
     }
   };
 
@@ -615,41 +628,28 @@ const Checkout = () => {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-6"
               >
-                <div className="bg-card rounded-2xl p-6 shadow-soft">
+                <div className="bg-card rounded-2xl p-6 shadow-soft text-center">
                   <h2 className="font-display font-bold text-xl mb-6">
                     <CreditCard className="w-5 h-5 inline mr-2" />
-                    Payment Information
+                    Pay Securely with Card or UPI
                   </h2>
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="cardName">Name on Card</Label>
-                      <Input id="cardName" placeholder="John Doe" value={formData.cardName} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" value={formData.cardNumber} onChange={handleInputChange} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM/YY" value={formData.expiry} onChange={handleInputChange} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cvv">CVV</Label>
-                        <Input id="cvv" placeholder="123" value={formData.cvv} onChange={handleInputChange} />
-                      </div>
-                    </div>
-                  </div>
-
+                  <p className="mb-4 text-muted-foreground">Click below to pay with Card, UPI, or Netbanking using Razorpay's secure checkout.</p>
+                  <Button
+                    variant="hero"
+                    size="xl"
+                    className="w-full"
+                    onClick={handleConfirmation}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? "Processing..." : `Pay Now - ₹${total.toFixed(2)}`}
+                  </Button>
                   <div className="mt-6 p-4 bg-muted rounded-xl">
                     <p className="text-sm text-muted-foreground flex items-center gap-2">
                       <span className="text-lg">🔒</span>
-                      Your payment information is encrypted and secure
+                      Payments are processed securely by Razorpay
                     </p>
                   </div>
                 </div>
-
                 <div className="flex gap-4">
                   <Button
                     variant="outline"
@@ -659,15 +659,6 @@ const Checkout = () => {
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back
-                  </Button>
-                  <Button
-                    variant="hero"
-                    size="xl"
-                    className="flex-1"
-                    onClick={handleConfirmation}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? "Processing..." : `Place Order - ₹${total.toFixed(2)}`}
                   </Button>
                 </div>
               </motion.div>
@@ -699,7 +690,7 @@ const Checkout = () => {
                         <p className="text-xs text-muted-foreground">
                           Size: {designToBuy.size} • Qty: {designToBuy.quantity}
                         </p>
-                        <p className="text-sm font-semibold mt-2">${designPrice.toFixed(2)}</p>
+                        <p className="text-sm font-semibold mt-2">₹{designPrice.toFixed(2)}</p>
                       </div>
                     </div>
                   </div>

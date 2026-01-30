@@ -48,6 +48,7 @@ router.post('/', authMiddleware, upload.single('image'), async (req: AuthRequest
       quantity,
       image_scale,
       image_rotation,
+      price,
     } = req.body;
 
     let imageUrl = existing_image_url;
@@ -87,6 +88,7 @@ router.post('/', authMiddleware, upload.single('image'), async (req: AuthRequest
           quantity,
           image_scale: parseFloat(image_scale),
           image_rotation: parseFloat(image_rotation),
+          price: price !== undefined ? parseFloat(price) : null,
         })
         .eq('id', designId)
         .eq('user_id', userId)
@@ -114,6 +116,7 @@ router.post('/', authMiddleware, upload.single('image'), async (req: AuthRequest
         image_scale: parseFloat(image_scale),
         image_rotation: parseFloat(image_rotation),
         status: 'pending',
+        price: price !== undefined ? parseFloat(price) : null,
       }])
       .select()
       .single();

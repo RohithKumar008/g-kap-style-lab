@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ThreeShirtViewer } from "@/components/customizer/ThreeShirtViewer";
 import api from "@/config/api";
 
-const sizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
+const sizes = ["S", "M", "L", "XL"];
 
 const printLocations = [
   { id: "front", name: "Front" },
@@ -508,7 +508,7 @@ const Customize = () => {
                 <div className="flex justify-between items-center mb-6">
                   <span className="font-display font-bold text-xl">Total</span>
                   <span className="font-display font-bold text-2xl text-gradient-primary">
-                    ${totalPrice.toFixed(2)}
+                    ₹{totalPrice.toFixed(2)}
                   </span>
                 </div>
 
@@ -550,6 +550,7 @@ const Customize = () => {
                       formData.append("size", selectedSize);
                       formData.append("print_location", printLocation);
                       formData.append("quantity", quantity.toString());
+                      formData.append("price", totalPrice.toString());
 
                       // If composited texture exists, convert to file and upload
                       if (composedTexture && hasAnySideImage) {

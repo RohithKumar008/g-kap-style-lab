@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { sendOrderNotification } from '../utils/email';
 
 const router = Router();
 
@@ -104,6 +105,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       size: item.size,
       color: item.color,
       price: item.price,
+      design_id: item.design_id || null,
     }));
 
     const { error: itemsError } = await supabase
@@ -112,6 +114,43 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     if (itemsError) {
       return res.status(400).json({ error: itemsError.message });
+    }
+
+    // Fetch custom design info if present
+    let customDesignInfo = '';
+    let customDesignImage = '';
+    const customItem = items.find((item: any) => item.design_id);
+    if (customItem && customItem.design_id) {
+      const { data: design } = await supabase
+        .from('custom_designs')
+        .select('*')
+        .eq('id', customItem.design_id)
+        .single();
+      if (design) {
+        customDesignInfo = `\nCustom Design: ${design.tshirt_type} - ${design.tshirt_color}, Size: ${design.size}, Qty: ${design.quantity}`;
+        if (design.image_url) {
+          customDesignImage = `<br><b>Uploaded Logo:</b><br><img src="${design.image_url}" alt="Custom Logo" style="max-width:200px;">`;
+        }
+      }
+    }
+
+    // Send notification email
+    try {
+      await sendOrderNotification({
+        to: process.env.NOTIFY_EMAIL_TO || process.env.NOTIFY_EMAIL_USER,
+        subject: `New Order Received: ${order.id}`,
+        html: `
+          <h2>New Order Placed</h2>
+          <b>Order ID:</b> ${order.id}<br>
+          <b>Location:</b> ${shipping_address?.city || ''}, ${shipping_address?.state || ''}, ${shipping_address?.country || ''}<br>
+          <b>Order Details:</b> ${items.map((item: any) => `${item.product_id ? 'Product' : 'Custom'} - Size: ${item.size}, Color: ${item.color}, Qty: ${item.quantity}`).join(', ')}
+          ${customDesignInfo}
+          ${customDesignImage}
+        `,
+      });
+    } catch (e) {
+      // Log but don't block order creation
+      console.error('Order notification email failed:', e);
     }
 
     // Clear cart after order

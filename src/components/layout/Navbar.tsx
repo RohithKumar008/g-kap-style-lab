@@ -63,12 +63,14 @@ export const Navbar = () => {
         initial={{ y: -100 }}
         animate={{ y: isVisible ? 0 : -100 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="fixed top-0 w-full border-b border-black overflow-hidden z-50"
-        style={{ backgroundColor: 'var(--navbar-bg, rgb(109, 236, 71))' }}
+        className="fixed top-0 w-full border-b border-black overflow-hidden z-50 group"
+        style={{ backgroundColor: 'transparent', transition: 'background 0.3s' }}
+        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'white')}
+        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
       >
         <nav
           className="section-container py-2"
-          style={{ backgroundColor: 'var(--navbar-bg, rgb(109, 236, 71))' }}
+          style={{ backgroundColor: 'transparent' }}
         >
           <div className="flex items-center justify-between h-12 md:h-14">
             {/* Logo */}
